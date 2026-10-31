@@ -268,11 +268,14 @@
             [dyldPatchSpecifier setProperty:@NO forKey:@"default"];
             [specifiers addObject:dyldPatchSpecifier];
 
-            PSSpecifier *isolationSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_Spinlock_Isolation") target:self set:@selector(setSpinlockIsolationEnabled:specifier:) get:@selector(readSpinlockIsolationEnabled:) detail:nil cell:PSSwitchCell edit:nil];
-            [isolationSpecifier setProperty:@YES forKey:@"enabled"];
-            [isolationSpecifier setProperty:@"spinlockSafeIsolationEnabled" forKey:@"key"];
-            [isolationSpecifier setProperty:@YES forKey:@"default"];
-            [specifiers addObject:isolationSpecifier];
+            // Only meaningful on the platform the repair actually supports.
+            if (envManager.isArm64e && NSProcessInfo.processInfo.operatingSystemVersion.majorVersion == 15) {
+                PSSpecifier *isolationSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_Spinlock_Isolation") target:self set:@selector(setSpinlockIsolationEnabled:specifier:) get:@selector(readSpinlockIsolationEnabled:) detail:nil cell:PSSwitchCell edit:nil];
+                [isolationSpecifier setProperty:@YES forKey:@"enabled"];
+                [isolationSpecifier setProperty:@"spinlockSafeIsolationEnabled" forKey:@"key"];
+                [isolationSpecifier setProperty:@YES forKey:@"default"];
+                [specifiers addObject:isolationSpecifier];
+            }
             /**************************** roothide specfic *********************************/
             
             
@@ -552,8 +555,11 @@
         xpc_object_t value = NULL;
         if (jbclient_jbsettings_get("trollStoreLiteFixEnabled", &value) == 0
             && value && xpc_get_type(value) == XPC_TYPE_BOOL) {
-            return @(xpc_bool_get_value(value));
+            BOOL enabled = xpc_bool_get_value(value);
+            xpc_release(value);
+            return @(enabled);
         }
+        if (value) xpc_release(value);
     }
     return [self readPreferenceValue:specifier];
 }
@@ -578,8 +584,11 @@
         xpc_object_t value = NULL;
         if (jbclient_jbsettings_get("spinlockSafeIsolationEnabled", &value) == 0
             && value && xpc_get_type(value) == XPC_TYPE_BOOL) {
-            return @(xpc_bool_get_value(value));
+            BOOL enabled = xpc_bool_get_value(value);
+            xpc_release(value);
+            return @(enabled);
         }
+        if (value) xpc_release(value);
     }
     return [self readPreferenceValue:specifier];
 }
