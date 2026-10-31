@@ -40,6 +40,7 @@ char* proc_get_identifier(pid_t pid, char buffer[255]);
 bool isBlacklistedApp(const char* identifier);
 bool isBlacklistedPath(const char* path);
 bool appSpinlockIsolationRequested(const char *path);
+bool appSpinlockIsolationOptedOut(const char *path);
 
 bool isBlacklistedToken(audit_token_t* token);
 bool isBlacklistedPid(pid_t pid);

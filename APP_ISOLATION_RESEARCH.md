@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-This is an opt-in research candidate on `feature/app-isolation-spinlock`, based on Dopamine `c2b9cfe`. It does not change the connected phone, replace an installed engine, enable any app, or request a reboot. Default behavior is unchanged when the new key is absent.
+This is an automatic research candidate on `feature/app-isolation-spinlock`, based on Dopamine `c2b9cfe`. Every effectively blacklisted app on a supported device uses it, with a per-app opt-out. It does not change the connected phone, replace an installed engine, or request a reboot.
 
 The aim is to combine genuine non-injection of the normal RootHide chain with existing server-side full-blacklist treatment, while retaining the existing iOS15 arm64e loadDyldCache repair. This is not a promise of zero spinlock panics, an undetectable jailbreak, or a complete stock process. It does not falsify dyld image lists or other detection results.
 
@@ -12,24 +12,28 @@ All of these must be true:
 
 - The process is already effectively fully blacklisted by the existing RootHide/fork whitelist policy.
 - It is the verified main executable of an ordinary removable application bundle.
-- Neither `_TrollStore` nor `_TrollStoreLite` is present for that application.
 - Platform is iOS15 arm64e and the existing global dyld fix is enabled.
-- The per-bundle `appconfigSpinlockSafe` entry is the actual plist Boolean `true`.
+- The per-bundle `appconfigSpinlockSafe` entry is entirely optional now. The route
+  is automatic for every effectively blacklisted app on a supported device; an
+  explicit plist Boolean `false` opts one app out, anything else keeps it on.
 - TrollStore and TrollStore Lite applications are eligible too. Lite keeps the
   legacy pre-launch trust grant, which is re-issued from launchd before the repair.
 
-System processes, daemons, arbitrary helpers, unknown bundles and unsupported platforms cannot be opted into this route by bundle name alone. If the toggle is off or eligibility fails, the old full-blacklist route remains in force. Extension and ActivePrewarm/DYLD_USE_CLOSURES restrictions retain their original precedence, even for opted-in apps. This first candidate does not restore blocked extensions or prewarming.
+System processes, daemons, arbitrary helpers and unsupported platforms cannot enter this route. If the platform gate fails or an app opts out, the old full-blacklist route remains in force. Extension and ActivePrewarm/DYLD_USE_CLOSURES restrictions retain their original precedence, even for opted-in apps. This first candidate does not restore blocked extensions or prewarming.
 
-Configuration format in the EXISTING `jbroot:/var/mobile/Library/RootHide/RootHideConfig.plist`:
+Configuration in the EXISTING `jbroot:/var/mobile/Library/RootHide/RootHideConfig.plist`
+is now only an opt-out:
 
 ```text
 appconfig:                     # existing RootHide blacklist configuration
   com.example.application: true
-appconfigSpinlockSafe:          # new experimental opt-in; absent by default
-  com.example.application: true
+appconfigSpinlockSafe:          # optional; only Boolean false disables the route
+  com.example.application: false
 ```
 
-The new entry does not establish blacklist membership by itself and cannot override this fork's executable/system allowlists. Do not replace the whole config with this example; it illustrates two keys only. No preference file is shipped or written by the build, and there is no GUI toggle for this experimental key yet. Disable by removing only the target key from appconfigSpinlockSafe; all changes require a fresh app process. Existing running processes cannot be reverted/unloaded by a config edit.
+No preference file is shipped or written by the build. Removing the entry, or
+setting it to true, keeps the automatic behaviour. Changes require a fresh app
+process; existing running processes cannot be reverted by a config edit.
 
 ## What the new route preserves and changes
 
