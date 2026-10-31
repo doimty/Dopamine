@@ -363,8 +363,39 @@ static int isolation_spawn_original(void *opaque, pid_t *published) {
     return __posix_spawn_orig_wrapper(published, context->path, context->desc,
         context->argv, context->envp);
 }
+// The legacy blacklist wrapper grants this to TrollStoreLite apps from trusted
+// launchd. Replacing that wrapper must not silently drop the grant, so mirror it
+// here before the repair. Failure is logged but not fatal, as in the legacy path.
+static void isolation_grant_lite_trust(const char *path, pid_t child) {
+    if (!path || !hasTrollstoreLiteMarker(path)) return;
+    mach_port_t task = MACH_PORT_NULL;
+    if (task_name_for_pid(mach_task_self(), child, &task) != KERN_SUCCESS) {
+        JBLogError("isolation: no audit token for %d", child);
+        return;
+    }
+    audit_token_t token = {0};
+    mach_msg_type_number_t count = TASK_AUDIT_TOKEN_COUNT;
+    kern_return_t kr = task_info(task, TASK_AUDIT_TOKEN, (task_info_t)&token, &count);
+    mach_port_deallocate(mach_task_self(), task);
+    if (kr != KERN_SUCCESS) {
+        JBLogError("isolation: task_info failed for %d: %d", child, kr);
+        return;
+    }
+    char *rootPath = NULL;
+    char *bootUUID = NULL;
+    bool fullyDebugged = false;
+    bool forceCSAdhoc = false;
+    if (systemwide_process_checkin(&token, &rootPath, &bootUUID, NULL,
+            &fullyDebugged, &forceCSAdhoc) != 0) {
+        JBLogError("isolation: lite trust grant failed for %d", child);
+    }
+    free(rootPath);
+    free(bootUUID);
+}
+
 static int isolation_install_repair(void *opaque, pid_t child) {
-    (void)opaque;
+    struct app_isolation_native_context *context = opaque;
+    isolation_grant_lite_trust(context ? context->path : NULL, child);
     return jbdAppIsolationRepair(child);
 }
 static int isolation_resume(void *opaque, pid_t child) {
@@ -579,7 +610,7 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
 
 	bool roothideBlacklisted = isBlacklistedPath(path);
     bool requestedIsolation = roothideBlacklisted && iOS15Arm64e && dyld_patch_enabled() &&
-        !hasTrollstoreMarker(path) && appSpinlockIsolationRequested(path);
+        appSpinlockIsolationRequested(path);
     struct app_isolation_context isolationContext = {
         .ios15_arm64e = iOS15Arm64e,
         .global_dyld_fix = dyld_patch_enabled(),

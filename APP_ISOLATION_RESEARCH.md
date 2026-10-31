@@ -15,6 +15,8 @@ All of these must be true:
 - Neither `_TrollStore` nor `_TrollStoreLite` is present for that application.
 - Platform is iOS15 arm64e and the existing global dyld fix is enabled.
 - The per-bundle `appconfigSpinlockSafe` entry is the actual plist Boolean `true`.
+- TrollStore and TrollStore Lite applications are eligible too. Lite keeps the
+  legacy pre-launch trust grant, which is re-issued from launchd before the repair.
 
 System processes, daemons, arbitrary helpers, unknown bundles and unsupported platforms cannot be opted into this route by bundle name alone. If the toggle is off or eligibility fails, the old full-blacklist route remains in force. Extension and ActivePrewarm/DYLD_USE_CLOSURES restrictions retain their original precedence, even for opted-in apps. This first candidate does not restore blocked extensions or prewarming.
 

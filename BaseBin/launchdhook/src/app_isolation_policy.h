@@ -27,7 +27,9 @@ enum app_isolation_route {
  * ordinary_removable_app: a verified ordinary removable app main executable;
  *     false for system/critical processes, helpers and non-app paths. The caller
  *     must validate the actual executable path, not just a bundle identifier.
- * not_trollstore: false for both TrollStore and TrollStore Lite apps.
+ * not_trollstore: false for both TrollStore and TrollStore Lite apps. Production
+ *     wiring currently passes true so every app kind can opt in; the gate stays
+ *     available and covered by tests.
  * spinlock_safe_opt_in: the appconfigSpinlockSafe[bundleID] value is bool true.
  * is_extension: classification of the actual spawn path using the helper below.
  * active_prewarm / dyld_use_closures: environment variable presence, even if the
