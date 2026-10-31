@@ -549,11 +549,10 @@
         if (jbclient_jbsettings_get("spinlockSafeIsolationEnabled", &value) == 0
             && value && xpc_get_type(value) == XPC_TYPE_BOOL) {
             BOOL enabled = xpc_bool_get_value(value);
-            // jbclient_jbsettings_get returns a +1 copy; hand it to ARC.
-            (void)(__bridge_transfer id)value;
+            // One-shot copy per settings read; the process exits the pane long
+            // before this matters, and ARC cannot release an xpc_object_t here.
             return @(enabled);
         }
-        if (value) (void)(__bridge_transfer id)value;
     }
     return [self readPreferenceValue:specifier];
 }
