@@ -94,6 +94,31 @@ static bool isBlacklistedPath_orig(const char* path)
     return isBlacklistedApp(identifier.UTF8String);
 }
 
+// Opt-in is separate from blacklist membership; it never turns isolation on by itself.
+bool appSpinlockIsolationRequested(const char *path)
+{
+    NSString *bundlePath = getAppBundlePathFromSpawnPath(path);
+    if (!bundlePath) return false;
+    NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:[bundlePath stringByAppendingPathComponent:@"Info.plist"]];
+    if (![info isKindOfClass:NSDictionary.class]) return false;
+    NSString *identifier = info[@"CFBundleIdentifier"];
+    NSString *executable = info[@"CFBundleExecutable"];
+    if (![identifier isKindOfClass:NSString.class] || !identifier.length ||
+        ![executable isKindOfClass:NSString.class] || !executable.length ||
+        [executable containsString:@"/"]) return false;
+    NSString *expected = [[bundlePath stringByAppendingPathComponent:executable] stringByResolvingSymlinksInPath];
+    NSString *actual = [[NSString stringWithUTF8String:path] stringByResolvingSymlinksInPath];
+    if (![actual isEqualToString:expected]) return false;
+    NSDictionary *preferences = [NSDictionary dictionaryWithContentsOfFile:
+        JBROOT_PATH(@"/var/mobile/Library/RootHide/RootHideConfig.plist")];
+    if (![preferences isKindOfClass:NSDictionary.class]) return false;
+    NSDictionary *apps = preferences[@"appconfigSpinlockSafe"];
+    if (![apps isKindOfClass:NSDictionary.class]) return false;
+    id enabled = apps[identifier];
+    return enabled && CFGetTypeID((__bridge CFTypeRef)enabled) == CFBooleanGetTypeID() &&
+        CFBooleanGetValue((__bridge CFBooleanRef)enabled);
+}
+
 static const char *injectPlistPath = NULL;
 static const char *injectSystemPlistPath = NULL;
 

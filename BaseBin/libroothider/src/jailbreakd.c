@@ -9,6 +9,8 @@
 
 #include <libjailbreak/libjailbreak.h>
 #include "jailbreakd.h"
+#include "app_isolation_reply.h"
+#include <errno.h>
 #include "common.h"
 #include "log.h"
 
@@ -387,6 +389,21 @@ int jbdSpinlockFixOnly(int pid, bool resume)
 		xpc_release(reply);
 	}
 	return result;
+}
+
+int jbdAppIsolationRepair(pid_t pid)
+{
+    if (getpid() != 1 || pid <= 1) return EPERM;
+    xpc_object_t message = xpc_dictionary_create_empty();
+    if (!message) return ENOMEM;
+    xpc_dictionary_set_uint64(message, "id", JBD_MSG_APP_ISOLATION_REPAIR);
+    xpc_dictionary_set_int64(message, "pid", pid);
+    xpc_dictionary_set_uint64(message, "isolation-protocol", RH_APP_ISOLATION_PROTOCOL);
+    xpc_object_t reply = jailbreakdXpcRequest(message);
+    xpc_release(message);
+    int result = rh_app_isolation_reply_status(reply);
+    if (reply) xpc_release(reply);
+    return result;
 }
 
 int jbdSpawnExecStart(const char* execfile, bool resume)
