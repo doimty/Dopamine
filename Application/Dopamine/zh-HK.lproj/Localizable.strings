@@ -152,3 +152,4 @@
 "Uptime_Format" = "%llu天 %02llu:%02llu:%02llu";
 "Build version: %@" = "編譯版本：%@";
 "Build time: %@" = "編譯時間：%@";
+"Settings_Spinlock_Isolation" = "黑名單應用 Spinlock 隔離";

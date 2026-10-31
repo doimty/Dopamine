@@ -158,7 +158,7 @@
 // Additional UI strings
 "Settings_Title" = "Settings";
 "Settings_TrollStoreLite_Fix" = "TrollStoreLite Fix";
-"Settings_Spinlock_Isolation" = "Spinlock Isolation for Blacklisted Apps";
+"Settings_Spinlock_Isolation" = "Blacklist Spinlock Isolation";
 "Error" = "Error";
 "OK" = "OK";
 "Warning" = "Warning";
