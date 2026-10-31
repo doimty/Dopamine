@@ -1,0 +1,172 @@
+"Credits_Made_By" = "by opa334, ElleKit by évelyne";
+
+// Log
+"Status_Title_Jailbreaking" = "Jailbreaking";
+"Log_Error" = "Error";
+
+// Jailbreak Button
+"Button_Jailbreak_Title" = "Jailbreak";
+"Status_Title_Jailbroken" = "Jailbroken";
+"Unsupported" = "Unsupported";
+
+// Action Menu
+"Menu_Settings_Title" = "Settings";
+"Menu_Restart_SpringBoard_Title" = "Restart SpringBoard";
+"Menu_Reboot_Userspace_Title" = "Reboot Userspace";
+"Menu_Credits_Title" = "Credits";
+
+// Updating
+"Button_Update" = "Update";
+"Button_Update_Available" = "Update Available";
+"Button_Update_Environment" = "Update Environment";
+
+// Update View
+"Update_Status_Downloading" = "Downloading update...";
+"Update_Status_Subtitle_Please_Wait" = "Please wait while files finish downloading";
+"Update_Status_Installing" = "Installing update...";
+"Update_Status_Subtitle_Restart_Soon" = "The device will restart soon";
+"Title_Changelog" = "Changelog";
+"Changelog_Unavailable_Text" = "Changelog Unavailable";
+
+// Removed Jailbreak Alert
+"Removed_Jailbreak_Alert_Title" = "Removed Jailbreak";
+"Removed_Jailbreak_Alert_Message" = "Successfully removed jailbreak. Rebooting the device is recommended.";
+"Button_Close" = "Close";
+
+// Error View
+"Button_Share" = "Share";
+"Button_Reboot" = "Reboot";
+
+// Settings Options
+"Settings_Tweak_Injection" = "Tweak Injection";
+"Settings_iDownload" = "iDownload (Developer Shell)";
+"Settings_Verbose_Logs" = "Verbose Logs";
+"Settings_Apps_JIT" = "Allow JIT in Apps";
+"Settings_Allow_Old_arm64e_ABI_Libraries" = "Allow Legacy arm64e Libraries";
+"Settings_Jetsam_Multiplier" = "Jetsam Additional Memory";
+
+// Settings Buttons
+"Button_Remove_Jailbreak" = "Remove Jailbreak";
+"Button_Hide_Jailbreak" = "Hide Jailbreak";
+"Button_Unhide_Jailbreak" = "Unhide Jailbreak";
+"Button_Refresh_Jailbreak_Apps" = "Refresh Jailbreak Apps";
+"Button_Reinstall_Package_Managers" = "Reinstall Package Managers";
+"Button_Change_Mobile_Password" = "Change \"mobile\" Password";
+
+// Settings Hints
+"Hint_Hide_Jailbreak" = "\"Hide Jailbreak\" temporarily removes jailbreak-related files until the next rejailbreak";
+"Hint_Hide_Jailbreak_Jailbroken" = "\"Hide Jailbreak\" can be used to temporarily disable the jailbreak to get past certain jailbreak detection methods. It is not entirely effective and does not conceal everything, but should get the device to a similar state as to the state it is in after a reboot before rejailbreaking. It is not an adaquent replacement or substitute for RootHide. No support is offered for this option as it can cause issues, use it on your own risk.";
+"Section_Jailbreak_Settings" = "Jailbreak Settings";
+"Section_Actions" = "Actions";
+"Section_Customization" = "Customization";
+"Section_Exploits" = "Exploits";
+"Section_Boot_Logo" = "Boot Logo";
+"Jetsam_Description" = "Adds the selected MB amount to each injected process’s configured allowance (10 MB by default; SpringBoard 1024 MB, xxtouch 48 MB, thermalmonitord 16 MB). Disabled leaves limits unchanged. Unlimited limits remain unlimited. Process allowances are stored in cn.zqbb.jetsam.addend.plist.";
+"Enabled" = "Enabled";
+"Custom_Boot_Logo" = "Custom Boot Logo";
+"Select_Image" = "Select Image";
+
+// Settings Alerts
+"Alert_Tweak_Injection_Toggled_Title" = "Userspace Reboot Required";
+"Alert_Tweak_Injection_Toggled_Body" = "A userspace reboot is neccessary to apply the changes. Do you want to do it now?";
+"Alert_Tweak_Injection_Toggled_Reboot_Now" = "Reboot Now";
+"Alert_Tweak_Injection_Toggled_Reboot_Later" = "Reboot Later";
+"Alert_Remove_Jailbreak_Title" = "Remove Jailbreak";
+"Alert_Remove_Jailbreak_Pressed_Body" = "Removing jailbreak will delete all jailbreak-related files, but all regular apps, files and data will be kept. Are you sure you want to continue? You can't undo this action.";
+"Alert_Remove_Jailbreak_Enabled_Body" = "Enabling \"Remove Jailbreak\" will delete all jailbreak-related files on the next jailbreak, but all regular apps, files and data will be kept. Are you sure you want to continue? You can't undo this action.";
+"Alert_Change_Mobile_Password_Body" = "Set the password of the \"mobile\" user on your device, this can also be used for root access using sudo. If you want to set the root password, you can do so from a mobile shell using the command \"sudo passwd root\"";
+"Password_Placeholder" = "Password";
+"Repeat_Password_Placeholder" = "Repeat Password";
+"Password_Auth_Required" = "Authentication is required to change your mobile password.";
+"Button_Change" = "Change";
+"Button_Cancel" = "Cancel";
+"Button_Continue" = "Continue";
+
+// Duplicate Apps Errors
+"Duplicate_Apps_Error_Dopamine_App" = "There are multiple apps with the identifier \"%@\" inside Dopamines application directory (\"%@\"). Cannot continue.";
+"Duplicate_Apps_Error_User_App" = "The apps with the identifiers %@ exist in Dopamines application directory (\"%@\") but are also installed separately on the system. Cannot continue.";
+"Duplicate_Apps_Error_Icon_Cache" = "The app with the identifier \"%@\" exists in the Dopamine application directory (\"%@\") but is also registered in icon cache under a different path (\"%@\"). Cannot continue.";
+
+// Settings Lists
+"Theme" = "Theme";
+"Kernel Exploit" = "Kernel Exploit";
+"PPL Bypass" = "PPL Bypass";
+"SPTM Bypass" = "SPTM Bypass";
+"PAC Bypass" = "PAC Bypass";
+"None" = "None";
+"Recommended" = "Recommended";
+
+// DarkSword Workaround
+"Respring_Required" = "Respring Required";
+"Respring_Required_Message" = "The selected Kernel exploit requires creating a contiguous memory mapping which on this device is only possible with a special workaround that performs a respring. After the respring is done, reopen the Dopamine app and press \"Jailbreak\" again.";
+"Respring_Required_Notice_A8" = "On your device the workaround does not work every time and you may need to apply it multiple times until this alert no longer appears.";
+"Apply_Workaround" = "Apply Workaround";
+"Respring_Cancel" = "Cancel";
+
+// Credits
+"Credits_Button_Discord" = "Discord";
+"Credits_Button_License" = "Licenses";
+"Credits_Button_Source_Code" = "Source Code";
+
+// Logs
+"Initializing Environment" = "Initializing Jailbreak Environment";
+"Initializing Protection" = "Initializing Protection";
+"Loading BaseBin TrustCache" = "Loading BaseBin TrustCache";
+"Applying Bind Mount" = "Applying Bind Mount";
+"Rebuilding Icon Cache" = "Rebuilding Icon Cache";
+"Removing Jailbreak" = "Removing Jailbreak";
+"Elevating Privileges" = "Elevating Privileges";
+"Cleaning Up Exploits" = "Cleaning Up Exploits";
+"Building Phys R/W Primitive" = "Building Phys R/W Primitive";
+"Rebooting Userspace" = "Rebooting Userspace";
+"Patchfinding" = "Patchfinding";
+"Exploiting Kernel (%@)" = "Exploiting Kernel (%@)";
+"Bypassing PAC (%@)" = "Bypassing PAC (%@)";
+"Bypassing PPL (%@)" = "Bypassing PPL (%@)";
+"Bypassing SPTM (%@)" = "Bypassing SPTM (%@)";
+
+// Package Manager selection
+"Status_Title_Select_Package_Managers" = "Select Package Manager(s)";
+"Select_Package_Managers_Install_Message" = "If you are unsure which one to select, select Sileo";
+"Continue" = "Continue";
+
+"Injection_Mode_Waiting" = "Waiting for jailbreak";
+
+"Injection_Mode_Whitelist" = "Whitelist";
+
+"Injection_Mode_Blacklist" = "Blacklist";
+
+"Sileo_Open_Failed" = "Could not open Sileo. Install Sileo and refresh its package sources first.";
+
+"Jetsam_Disabled" = "Disabled";
+
+"Install Whitelist App" = "Install Whitelist App";
+
+"Install Mount App" = "Install Mount App";
+
+"If you encounter any issues, please reproduce them using the official version before reporting." = "If you encounter any issues, please reproduce them using the official version before reporting.";
+
+// 主页系统信息
+"System version: %@" = "System version: %@";
+"System boot time: %@" = "System uptime: %@";
+"Unknown" = "Unknown";
+
+"Uptime_Format" = "%llu d %02llu:%02llu:%02llu";
+"Build version: %@" = "Build version: %@";
+"Build time: %@" = "Build time: %@";
+
+// Additional UI strings
+"Settings_Title" = "Settings";
+"Settings_TrollStoreLite_Fix" = "TrollStoreLite Fix";
+"Error" = "Error";
+"OK" = "OK";
+"Warning" = "Warning";
+"Other_Jailbreak_Active_Message" = "Your device currently has another jailbreak activated. Please reboot the device.";
+"Enable_Dyld_Patch" = "Enable dyld patch";
+"Dyld_Patch_Spinlock_Fix" = "Dyld Patch (Spinlock Fix)";
+"Checking_For_Duplicate_Apps" = "Checking For Duplicate Apps";
+"Hiding_Jailbreak" = "Hiding Jailbreak";
+"Done" = "Done";
+"Jailbreak_Failed_With_Error" = "Jailbreak failed with error: %@";
+"Setting_Apply_Failed_Message" = "Could not apply this setting. Update the jailbreak environment and try again.";
+"Spinlock_Fix_Warning" = "When spinlock fix is enabled, app extensions of blacklisted apps will be disabled and may also cause spinlock panics when the blacklisted app is in the foreground or background.\n\nYou can first try disabling tweak injection for the app in Choicy (spinlock fix still works), and only blacklist the app if that does not work.";
