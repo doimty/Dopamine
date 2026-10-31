@@ -399,9 +399,26 @@ int jbdAppIsolationRepair(pid_t pid)
     xpc_dictionary_set_uint64(message, "id", JBD_MSG_APP_ISOLATION_REPAIR);
     xpc_dictionary_set_int64(message, "pid", pid);
     xpc_dictionary_set_uint64(message, "isolation-protocol", RH_APP_ISOLATION_PROTOCOL);
-    xpc_object_t reply = jailbreakdXpcRequest(message);
+    // Do not enter reactiveJailbreakdPort(): its legacy failure path may abort
+    // launchd. This opt-in request must reject a dead current port instead.
+    mach_port_t isolationPort = gJailbreakdPort;
+    if (!MACH_PORT_VALID(isolationPort) ||
+        mach_port_mod_refs(mach_task_self(), isolationPort, MACH_PORT_RIGHT_SEND, 1) != KERN_SUCCESS) {
+        xpc_release(message);
+        return ENOTCONN;
+    }
+    xpc_object_t pipe = xpc_pipe_create_from_port(isolationPort, 0);
+    if (!pipe) {
+        mach_port_deallocate(mach_task_self(), isolationPort);
+        xpc_release(message);
+        return ENOTCONN;
+    }
+    xpc_object_t reply = NULL;
+    int transport = xpc_pipe_routine(pipe, message, &reply);
+    xpc_release(pipe);
+    mach_port_deallocate(mach_task_self(), isolationPort);
     xpc_release(message);
-    int result = rh_app_isolation_reply_status(reply);
+    int result = transport == 0 ? rh_app_isolation_reply_status(reply) : EIO;
     if (reply) xpc_release(reply);
     return result;
 }
