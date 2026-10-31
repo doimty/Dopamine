@@ -166,6 +166,7 @@
 "Rebuilding Icon Cache" = "重建图标缓存";
 "Settings_Title" = "设置";
 "Settings_TrollStoreLite_Fix" = "TrollStoreLite 修复";
+"Settings_Spinlock_Isolation" = "黑名单应用 Spinlock 隔离";
 "Error" = "错误";
 "OK" = "好";
 "Warning" = "警告";

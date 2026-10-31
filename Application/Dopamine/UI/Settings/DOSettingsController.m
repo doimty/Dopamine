@@ -267,6 +267,12 @@
             [dyldPatchSpecifier setProperty:@"dyldPatchEnabled" forKey:@"key"];
             [dyldPatchSpecifier setProperty:@NO forKey:@"default"];
             [specifiers addObject:dyldPatchSpecifier];
+
+            PSSpecifier *isolationSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_Spinlock_Isolation") target:self set:@selector(setSpinlockIsolationEnabled:specifier:) get:@selector(readSpinlockIsolationEnabled:) detail:nil cell:PSSwitchCell edit:nil];
+            [isolationSpecifier setProperty:@YES forKey:@"enabled"];
+            [isolationSpecifier setProperty:@"spinlockSafeIsolationEnabled" forKey:@"key"];
+            [isolationSpecifier setProperty:@YES forKey:@"default"];
+            [specifiers addObject:isolationSpecifier];
             /**************************** roothide specfic *********************************/
             
             
@@ -557,6 +563,31 @@
 {
     if ([DOEnvironmentManager sharedManager].isJailbroken
         && jbclient_platform_jbsettings_set_bool("trollStoreLiteFixEnabled", [value boolValue]) != 0) {
+        [self reloadSpecifiers];
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Error") message:DOLocalizedString(@"Setting_Apply_Failed_Message") preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:DOLocalizedString(@"OK") style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    [self setPreferenceValue:value specifier:specifier];
+}
+
+- (id)readSpinlockIsolationEnabled:(PSSpecifier *)specifier
+{
+    if ([DOEnvironmentManager sharedManager].isJailbroken) {
+        xpc_object_t value = NULL;
+        if (jbclient_jbsettings_get("spinlockSafeIsolationEnabled", &value) == 0
+            && value && xpc_get_type(value) == XPC_TYPE_BOOL) {
+            return @(xpc_bool_get_value(value));
+        }
+    }
+    return [self readPreferenceValue:specifier];
+}
+
+- (void)setSpinlockIsolationEnabled:(id)value specifier:(PSSpecifier *)specifier
+{
+    if ([DOEnvironmentManager sharedManager].isJailbroken
+        && jbclient_platform_jbsettings_set_bool("spinlockSafeIsolationEnabled", [value boolValue]) != 0) {
         [self reloadSpecifiers];
         UIAlertController *alert = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Error") message:DOLocalizedString(@"Setting_Apply_Failed_Message") preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:DOLocalizedString(@"OK") style:UIAlertActionStyleDefault handler:nil]];
