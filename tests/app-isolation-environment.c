@@ -43,6 +43,16 @@ int main(void)
     assert(copy && copy[0] && !strcmp(copy[0], "A=") && !copy[1]);
     RHIsolationFreeEnvironment(copy);
 
+    /* First-load launchd has an empty (not NULL) active hook path. It must not
+     * be treated as matching empty colon components or arbitrary entries. */
+    char *filtered = RHIsolationCopyLibraryInserts("a::b:/usr/lib/systemhook.dylib::",
+        NULL, "");
+    assert(filtered && !strcmp(filtered, "a::b::"));
+    free(filtered);
+    filtered = RHIsolationCopyLibraryInserts("::", root, "");
+    assert(filtered && !strcmp(filtered, "::"));
+    free(filtered);
+
     struct rh_app_isolation_layout valid = {
         .stock_size = 0x50000, .patched_size = 0x70000,
         .stock_cache_function = 0x18000, .patched_cache_function = 0x20000,

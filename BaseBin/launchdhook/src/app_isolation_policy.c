@@ -140,7 +140,9 @@ static bool is_owned_library(const char *entry, size_t length,
     if (!path_is_canonical(entry, length)) {
         return false;
     }
-    if (active_hook && length == active_hook_length &&
+    // An empty active-hook path is a real first-load state; it must not match
+    // empty components or any other entry.
+    if (active_hook_length > 0 && active_hook && length == active_hook_length &&
         memcmp(entry, active_hook, length) == 0) {
         return true;
     }

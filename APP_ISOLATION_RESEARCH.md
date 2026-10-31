@@ -68,4 +68,6 @@ The CI also builds the actual launchdhook, libroothider and jailbreakd integrati
 
 ## Relationship to the earlier startup patch
 
+A Chinese, step-by-step device acceptance checklist is available in [APP_ISOLATION_VALIDATION_ZH.md](APP_ISOLATION_VALIDATION_ZH.md). It is a plan, not a record of device tests performed.
+
 The libhooker22/23 dyld fork-SPI misuse fix is a separate engine change. This Dopamine isolation route does not silently install that engine patch and does not claim to repair every unrelated launchd or plugin incompatibility.
