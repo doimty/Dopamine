@@ -51,7 +51,7 @@
         UILabel *label = [[UILabel alloc] init];
         label.text = title;
         label.font = [UIFont systemFontOfSize:16 weight:UIFontWeightMedium];
-        label.textColor = [UIColor labelColor];
+        label.textColor = [UIColor colorWithWhite:1.0 alpha:1.0];
 
         self.selector = [[UIImageView alloc] init];
         self.selector.translatesAutoresizingMaskIntoConstraints = NO;
@@ -82,7 +82,7 @@
 -(void)setSelected:(BOOL)selected {
     _selected = selected;
     self.selector.image = selected ? [UIImage systemImageNamed:@"checkmark.circle.fill"] : [UIImage systemImageNamed:@"circle"];
-    self.selector.tintColor = selected ? [UIColor systemBlueColor] : [UIColor secondaryLabelColor];
+    self.selector.tintColor = selected ? [UIColor whiteColor] : [UIColor colorWithWhite:1.0 alpha:0.5];
 }
 
 -(void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {

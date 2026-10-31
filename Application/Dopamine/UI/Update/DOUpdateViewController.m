@@ -41,12 +41,11 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.view.backgroundColor = [UIColor systemBackgroundColor];
 
     UILabel *title = [[UILabel alloc] init];
     title.text = DOLocalizedString(@"Title_Changelog");
     title.font = [UIFont systemFontOfSize:24 weight:UIFontWeightMedium];
-    title.textColor = [UIColor labelColor];
+    title.textColor = [UIColor colorWithWhite:1.0 alpha:1.0];
     title.textAlignment = NSTextAlignmentCenter;
     title.translatesAutoresizingMaskIntoConstraints = NO;
 
@@ -62,7 +61,7 @@
 
     self.changelog = [[UITextView alloc] init];
     self.changelog.font = [UIFont systemFontOfSize:16];
-    self.changelog.textColor = [UIColor labelColor];
+    self.changelog.textColor = [UIColor colorWithWhite:1.0 alpha:1.0];
     self.changelog.backgroundColor = [UIColor clearColor];
     self.changelog.translatesAutoresizingMaskIntoConstraints = NO;
     self.changelog.editable = NO;
@@ -176,7 +175,7 @@
 
     if (releases.count == 0)
     {
-        [changelogText appendAttributedString:[[NSAttributedString alloc] initWithString:DOLocalizedString(@"Changelog_Unavailable_Text") attributes:@{NSFontAttributeName: [UIFont systemFontOfSize:18], NSForegroundColorAttributeName : [UIColor labelColor], NSParagraphStyleAttributeName:paragraphStyle}]];
+        [changelogText appendAttributedString:[[NSAttributedString alloc] initWithString:DOLocalizedString(@"Changelog_Unavailable_Text") attributes:@{NSFontAttributeName: [UIFont systemFontOfSize:18], NSForegroundColorAttributeName : [UIColor whiteColor], NSParagraphStyleAttributeName:paragraphStyle}]];
         dispatch_async(dispatch_get_main_queue(), ^{
             self.changelog.attributedText = changelogText;
         });
@@ -187,7 +186,7 @@
         NSDictionary *release = (NSDictionary*)obj;
         NSString *name = release[@"name"];
         NSString *body = release[@"body"];
-        [changelogText appendAttributedString:[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"%@\n", name] attributes:@{NSFontAttributeName: [UIFont boldSystemFontOfSize:18], NSForegroundColorAttributeName : [UIColor labelColor], NSParagraphStyleAttributeName:paragraphStyle}]];
+        [changelogText appendAttributedString:[[NSAttributedString alloc] initWithString:[NSString stringWithFormat:@"%@\n", name] attributes:@{NSFontAttributeName: [UIFont boldSystemFontOfSize:18], NSForegroundColorAttributeName : [UIColor whiteColor], NSParagraphStyleAttributeName:paragraphStyle}]];
         [changelogText appendAttributedString:[[NSAttributedString alloc] initWithString:@"\n"]];
         
         NSAttributedStringMarkdownParsingOptions *parsingOptions = [[NSAttributedStringMarkdownParsingOptions alloc] init];
@@ -196,7 +195,7 @@
 
         NSMutableAttributedString *markdownStringMut = [[NSAttributedString alloc] initWithMarkdownString:body options:parsingOptions baseURL:nil error:nil].mutableCopy;
         
-        [markdownStringMut addAttributes:@{NSFontAttributeName: [UIFont systemFontOfSize:16], NSForegroundColorAttributeName : [UIColor labelColor], NSParagraphStyleAttributeName:paragraphStyle} range:NSMakeRange(0, markdownStringMut.length)];
+        [markdownStringMut addAttributes:@{NSFontAttributeName: [UIFont systemFontOfSize:16], NSForegroundColorAttributeName : [UIColor whiteColor], NSParagraphStyleAttributeName:paragraphStyle} range:NSMakeRange(0, markdownStringMut.length)];
 
         [changelogText appendAttributedString:markdownStringMut];
         
@@ -223,7 +222,7 @@
 
 - (UIStatusBarStyle)preferredStatusBarStyle
 {
-    return UIStatusBarStyleDefault;
+    return UIStatusBarStyleLightContent;
 }
 
 

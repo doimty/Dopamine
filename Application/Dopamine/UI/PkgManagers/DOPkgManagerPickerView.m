@@ -24,7 +24,6 @@
 -(id)initWithCallback:(void (^)(BOOL))callback {
     self = [super init];
     if (self) {
-        self.backgroundColor = [UIColor systemBackgroundColor];
         UIStackView *switchStack = [[UIStackView alloc] init];
         switchStack.axis = UILayoutConstraintAxisHorizontal;
         switchStack.translatesAutoresizingMaskIntoConstraints = NO;
@@ -58,7 +57,7 @@
 
         UILabel *title = [[UILabel alloc] init];
         title.text = DOLocalizedString(@"Status_Title_Select_Package_Managers");
-        title.textColor = [UIColor labelColor];
+        title.textColor = [UIColor whiteColor];
         title.font = [UIFont systemFontOfSize:24 weight:UIFontWeightMedium];
         title.textAlignment = NSTextAlignmentCenter;
         title.translatesAutoresizingMaskIntoConstraints = NO;
@@ -72,7 +71,7 @@
         
         UILabel *tooltip = [[UILabel alloc] init];
         tooltip.text = DOLocalizedString(@"Select_Package_Managers_Install_Message");
-        tooltip.textColor = [UIColor secondaryLabelColor];
+        tooltip.textColor = [UIColor colorWithWhite:1.0 alpha:0.5];
         tooltip.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
         tooltip.textAlignment = NSTextAlignmentCenter;
         tooltip.numberOfLines = 3;
@@ -115,16 +114,8 @@
 - (void)updateButtonState
 {
     NSArray *selected = [[DOUIManager sharedInstance] enabledPackageManagerKeys];
-    BOOL enabled = selected.count > 0;
-    self.continueAction.enabled = enabled;
-    self.continueAction.backgroundColor = enabled ? [UIColor systemBlueColor] : [UIColor secondarySystemFillColor];
-
-    UIButtonConfiguration *configuration = self.continueAction.configuration;
-    configuration.baseForegroundColor = enabled ? [UIColor whiteColor] : [UIColor tertiaryLabelColor];
-    configuration.imageColorTransformer = ^UIColor *(UIColor *color) {
-        return enabled ? [UIColor whiteColor] : [UIColor tertiaryLabelColor];
-    };
-    self.continueAction.configuration = configuration;
+    self.continueAction.enabled = selected.count > 0;
+    self.continueAction.backgroundColor = [UIColor colorWithWhite:1.0 alpha:selected.count > 0 ? 0.2 : 0.1];
 }
 
 @end

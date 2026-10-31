@@ -6,6 +6,7 @@
 //
 
 #import "DOPSListController.h"
+#import "DOThemeManager.h"
 
 @interface DOPSListController ()
 
@@ -16,16 +17,18 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     
-    [_table setSeparatorColor:[UIColor separatorColor]];
+    [_table setSeparatorColor:[UIColor clearColor]];
     [_table setBackgroundColor:[UIColor clearColor]];
     [DOPSListController setupViewControllerStyle:self];
 }
 
 + (void)setupViewControllerStyle:(UIViewController*)vc
 {
-    vc.overrideUserInterfaceStyle = UIUserInterfaceStyleUnspecified;
-    vc.view.backgroundColor = [UIColor systemGroupedBackgroundColor];
-    vc.view.layer.cornerRadius = 13;
+    DOTheme *theme = [[DOThemeManager sharedInstance] enabledTheme];
+    
+    vc.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+    vc.view.backgroundColor = theme.windowColor;
+    vc.view.layer.cornerRadius = 16;
     vc.view.layer.masksToBounds = YES;
     vc.view.layer.cornerCurve = kCACornerCurveContinuous;
     
@@ -35,12 +38,12 @@
         // I tried hard to fix it but failed in the end, so we will need to just use the stock tint color on iOS 26.0+
     }
     else {
-        [UISwitch appearanceWhenContainedInInstancesOfClasses:@[[vc class]]].onTintColor = [UIColor systemGreenColor];
+        [UISwitch appearanceWhenContainedInInstancesOfClasses:@[[vc class]]].onTintColor = [UIColor colorWithRed: 71.0/255.0 green: 169.0/255.0 blue: 135.0/255.0 alpha: 1.0];
     }
 }
 
 - (void)tableView:(UITableView *)tableView willDisplayCell:(UITableViewCell *)cell forRowAtIndexPath:(NSIndexPath *)indexPath {
-    cell.backgroundColor = [UIColor secondarySystemGroupedBackgroundColor];
+    cell.backgroundColor = [UIColor clearColor];
 }
 
 - (void)viewDidLayoutSubviews {
@@ -52,7 +55,7 @@
 
 - (UIStatusBarStyle)preferredStatusBarStyle
 {
-    return UIStatusBarStyleDefault;
+    return UIStatusBarStyleLightContent;
 }
 
 

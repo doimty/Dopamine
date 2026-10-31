@@ -24,8 +24,8 @@
         self.label = [[UILabel alloc] init];
         self.label.translatesAutoresizingMaskIntoConstraints = NO;
         self.label.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
-        self.label.textColor = [UIColor secondaryLabelColor];
-        self.label.alpha = 1.0;
+        self.label.textColor = [UIColor whiteColor];
+        self.label.alpha = 0.65;
         self.label.textAlignment = NSTextAlignmentLeft;
 
         [self.contentView addSubview:self.label];
@@ -38,7 +38,7 @@
         chevronImage = [chevronImage imageWithConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightRegular]];
         UIImageView *chevronView = [[UIImageView alloc] initWithImage:chevronImage];
         chevronView.translatesAutoresizingMaskIntoConstraints = NO;
-        chevronView.tintColor = [UIColor secondaryLabelColor];
+        chevronView.tintColor = [UIColor colorWithWhite:1 alpha:self.label.alpha];
         [self.contentView addSubview:chevronView];
         [NSLayoutConstraint activateConstraints:@[
             [chevronView.trailingAnchor constraintEqualToAnchor:self.label.trailingAnchor constant:17],

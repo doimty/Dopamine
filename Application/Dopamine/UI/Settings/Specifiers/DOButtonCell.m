@@ -27,19 +27,20 @@
         DOActionMenuButton *button = [DOActionMenuButton buttonWithAction:action chevron:NO];
 
         button.translatesAutoresizingMaskIntoConstraints = NO;
-        button.tintColor = [UIColor systemBlueColor];
-        [button setContentHorizontalAlignment:UIControlContentHorizontalAlignmentLeft];
-        UIButtonConfiguration *configuration = button.configuration;
-        configuration.baseForegroundColor = [UIColor systemBlueColor];
-        button.configuration = configuration;
+        [button setContentHorizontalAlignment:UIControlContentHorizontalAlignmentCenter];
+        button.layer.cornerRadius = 10;
+        button.layer.masksToBounds = YES;
+        button.layer.cornerCurve = kCACornerCurveContinuous;
+        button.layer.borderWidth = 1;
+        button.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.15].CGColor;
 
         [self.contentView addSubview:button];
 
         [NSLayoutConstraint activateConstraints:@[
-            [button.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:16],
-            [button.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-16],
-            [button.topAnchor constraintEqualToAnchor:self.topAnchor],
-            [button.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
+            [button.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:20],
+            [button.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-20],
+            [button.topAnchor constraintEqualToAnchor:self.topAnchor constant:4],
+            [button.bottomAnchor constraintEqualToAnchor:self.bottomAnchor constant:-4],
         ]];
     }
     return self;

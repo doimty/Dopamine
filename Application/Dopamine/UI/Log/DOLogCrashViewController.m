@@ -81,7 +81,7 @@
     _logView.text = [reverseLog componentsJoinedByString:@"\n"];
     _logView.editable = NO;
     _logView.font = [UIFont systemFontOfSize:14];
-    _logView.textColor = [UIColor labelColor];
+    _logView.textColor = [UIColor whiteColor];
     _logView.backgroundColor = [UIColor clearColor];
 }
 

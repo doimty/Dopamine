@@ -17,7 +17,7 @@
         self.label = [[UILabel alloc] init];
         self.label.translatesAutoresizingMaskIntoConstraints = NO;
         self.label.text = string;
-        self.label.textColor = [UIColor labelColor];
+        self.label.textColor = [UIColor whiteColor];
         self.label.font = [UIFont systemFontOfSize:20];
         [self addSubview:self.label];
 
@@ -56,7 +56,7 @@
     UIImageView *imageView = [[UIImageView alloc] initWithImage:image];
 
     imageView.translatesAutoresizingMaskIntoConstraints = NO;
-    imageView.tintColor = [UIColor labelColor];
+    imageView.tintColor = [UIColor whiteColor];
     imageView.alpha = 0;
 
     [self addSubview:imageView];

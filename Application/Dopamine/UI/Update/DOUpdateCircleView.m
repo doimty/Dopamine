@@ -30,12 +30,12 @@
 
     self.circleLayer = [CAShapeLayer layer];
     self.circleLayer.fillColor = [UIColor clearColor].CGColor;
-    self.circleLayer.strokeColor = [UIColor separatorColor].CGColor;
+    self.circleLayer.strokeColor = [UIColor colorWithWhite:1.0 alpha:0.1].CGColor;
     self.circleLayer.lineWidth = 10.0;
 
     self.progressLayer = [CAShapeLayer layer];
     self.progressLayer.fillColor = [UIColor clearColor].CGColor;
-    self.progressLayer.strokeColor = [UIColor systemBlueColor].CGColor;
+    self.progressLayer.strokeColor = [UIColor whiteColor].CGColor;
     self.progressLayer.lineWidth = 10.0;
     self.progressLayer.lineCap = kCALineCapRound;
 
@@ -44,7 +44,7 @@
     
     self.label = [[UILabel alloc] initWithFrame:self.bounds];
     self.label.textAlignment = NSTextAlignmentCenter;
-    self.label.textColor = [UIColor labelColor];
+    self.label.textColor = [UIColor whiteColor];
     self.label.font = [UIFont systemFontOfSize:29 weight:UIFontWeightMedium];
     self.label.translatesAutoresizingMaskIntoConstraints = NO;
 

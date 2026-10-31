@@ -16,7 +16,7 @@
         self.textView = [[UITextView alloc] init];
         self.textView.translatesAutoresizingMaskIntoConstraints = NO;
         self.textView.backgroundColor = [UIColor clearColor];
-        self.textView.textColor = [UIColor labelColor];
+        self.textView.textColor = [UIColor whiteColor];
         self.textView.font = [UIFont systemFontOfSize:14];
         self.textView.editable = NO;
         self.textView.scrollEnabled = YES;
@@ -32,7 +32,7 @@
             [self.textView.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
         ]];        
         
-        self.backgroundColor = [UIColor systemBackgroundColor];
+        self.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.7];
     }
     return self;
 }

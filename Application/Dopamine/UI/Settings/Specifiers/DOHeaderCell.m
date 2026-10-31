@@ -15,22 +15,20 @@
     {
         UILabel *titleLabel = [[UILabel alloc] init];
         [titleLabel setText:[specifier propertyForKey:@"title"]];
-        [titleLabel setFont:[UIFont systemFontOfSize:13 weight:UIFontWeightSemibold]];
-        [titleLabel setTextColor:[UIColor secondaryLabelColor]];
-        titleLabel.textAlignment = NSTextAlignmentLeft;
+        [titleLabel setFont:[UIFont systemFontOfSize:17 weight:UIFontWeightMedium]];
+        [titleLabel setTextColor:[UIColor whiteColor]];
         titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
         
         [self.contentView addSubview:titleLabel];
 
         [NSLayoutConstraint activateConstraints:@[
-            [titleLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:20],
-            [titleLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-20],
-            [titleLabel.centerYAnchor constraintEqualToAnchor:self.centerYAnchor constant:-2]
+            [titleLabel.centerYAnchor constraintEqualToAnchor:self.centerYAnchor constant:-3],
+            [titleLabel.centerXAnchor constraintEqualToAnchor:self.centerXAnchor]
         ]];
 
         UIView *border = [[UIView alloc] init];
         border.translatesAutoresizingMaskIntoConstraints = NO;
-        border.backgroundColor = [UIColor separatorColor];
+        border.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.1];
         [self.contentView addSubview:border];
 
         [NSLayoutConstraint activateConstraints:@[
@@ -45,7 +43,7 @@
 
 - (CGFloat)preferredHeightForWidth:(CGFloat)width
 {
-	return 36;
+	return 60;
 }
 
 @end

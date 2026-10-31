@@ -66,7 +66,7 @@
 
     self.license.editable = NO;
     self.license.font = [UIFont systemFontOfSize:14];
-    self.license.textColor = [UIColor labelColor];
+    self.license.textColor = [UIColor whiteColor];
     self.license.backgroundColor = [UIColor clearColor];
     self.selectedLicense = 0;
 
@@ -152,9 +152,9 @@
     {
         UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
         [button setTitle:license[@"name"] forState:UIControlStateNormal];
-        [button setTitleColor:[UIColor labelColor] forState:UIControlStateNormal];
+        [button setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
         button.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
-        button.backgroundColor = [UIColor secondarySystemFillColor];
+        button.backgroundColor = [UIColor whiteColor];
         button.layer.cornerRadius = 8;
         button.layer.cornerCurve = kCACornerCurveContinuous;
         button.translatesAutoresizingMaskIntoConstraints = NO;
