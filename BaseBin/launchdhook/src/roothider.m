@@ -611,7 +611,10 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
 	bool roothideBlacklisted = isBlacklistedPath(path);
     // Automatic: every effectively blacklisted app on a supported device gets the
     // repair unless the global switch is off or the app is explicitly opted out.
+    // The route needs the helper, so stay on the legacy path until the jailbreak
+    // is finalized and the helper port exists; otherwise spawn would be killed.
     bool requestedIsolation = roothideBlacklisted && iOS15Arm64e && dyld_patch_enabled() &&
+        !launchdhookFirstLoad && jbdIsolationHelperReady() &&
         spinlock_safe_isolation_enabled() && !appSpinlockIsolationOptedOut(path);
     struct app_isolation_context isolationContext = {
         .ios15_arm64e = iOS15Arm64e,

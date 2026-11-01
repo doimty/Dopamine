@@ -38,5 +38,6 @@ int jbdExecTraceStart(const char* execfile, bool* traced);
 int jbdExecTraceCancel(const char* execfile, bool* detached);
 int jbdSpinlockFixOnly(int pid, bool resume);
 int jbdAppIsolationRepair(pid_t pid);
+bool jbdIsolationHelperReady(void);
 
 #endif // JAILBREAKD_H

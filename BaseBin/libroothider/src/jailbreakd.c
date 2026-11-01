@@ -391,9 +391,14 @@ int jbdSpinlockFixOnly(int pid, bool resume)
 	return result;
 }
 
-int jbdAppIsolationRepair(pid_t pid)
+// The strict isolation route must not be selected before the helper can answer.
+bool jbdIsolationHelperReady(void)
 {
-    if (getpid() != 1 || pid <= 1) return EPERM;
+    return MACH_PORT_VALID(gJailbreakdPort);
+}
+
+int jbdAppIsolationRepair(pid_t pid)
+{    if (getpid() != 1 || pid <= 1) return EPERM;
     xpc_object_t message = xpc_dictionary_create_empty();
     if (!message) return ENOMEM;
     xpc_dictionary_set_uint64(message, "id", JBD_MSG_APP_ISOLATION_REPAIR);
