@@ -35,3 +35,15 @@ except BaseException:
 raise SystemExit(result)
 PY
 python3 "$repo_root/tests/check-isolation-ipc-wiring.py"
+
+# Host execution alone does not cover the different iOS audit/libproc header surface.
+# Compile this standalone production unit for each shipped architecture before the
+# full Theos build, using the same checked-in header source as BaseBin/.include.
+for arch in arm64 arm64e; do
+    xcrun --sdk iphoneos clang -std=c11 -fsyntax-only -arch "$arch" \
+        -miphoneos-version-min=15.0 -Werror=implicit-function-declaration \
+        -I"$repo_root/BaseBin/_external/include" \
+        -I"$repo_root/BaseBin/libroothider/src" \
+        "$repo_root/BaseBin/libroothider/src/app_isolation_mach.c"
+    printf 'PASS: production Mach transport iOS SDK declarations (%s)\n' "$arch"
+done

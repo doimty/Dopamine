@@ -1,5 +1,7 @@
 #include "app_isolation_mach.h"
 #include <bsm/libbsm.h>
+// iOS exposes audit token accessors through audit.h; macOS also has them in libbsm.h.
+#include <bsm/audit.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
