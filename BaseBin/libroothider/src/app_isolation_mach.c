@@ -1,7 +1,8 @@
 #include "app_isolation_mach.h"
-#include <bsm/libbsm.h>
-// iOS exposes audit token accessors through audit.h; macOS also has them in libbsm.h.
+// The checked-in iOS libbsm shim shares _BSM_AUDIT_H with audit.h. Include
+// audit.h first so its accessor declarations are not hidden by that shim.
 #include <bsm/audit.h>
+#include <bsm/libbsm.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>

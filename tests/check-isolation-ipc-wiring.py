@@ -33,6 +33,11 @@ systemhook_makefile = source("BaseBin/systemhook/Makefile")
 assert "-lbsm" in systemhook_makefile and "app_isolation_mach.c" in systemhook_makefile
 assert "size == (int)sizeof(info)" in mach
 assert "#include <bsm/audit.h>" in mach
+assert mach.index("#include <bsm/audit.h>") < mach.index("#include <bsm/libbsm.h>")
+# The source shim still uses audit.h's guard; check declaration ordering until
+# that upstream shim is replaced rather than silently masking the iOS accessors.
+audit_header = source("BaseBin/_external/include/bsm/audit.h")
+assert "audit_token_to_pid(audit_token_t" in audit_header
 mach_runner = source("scripts/test-app-isolation-mach.sh")
 assert "--sdk iphoneos clang" in mach_runner and "for arch in arm64 arm64e" in mach_runner
 assert "MACH_SEND_TIMEOUT" in mach and "MACH_RCV_TIMEOUT" in mach
