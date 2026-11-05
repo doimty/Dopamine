@@ -19,7 +19,9 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-latest
+    # Use the standard Intel pool while arm64-hosted runners are capacity constrained.
+    # All shipped iOS targets still build for arm64/arm64e via their existing flags.
+    runs-on: macos-26-intel
     timeout-minutes: 45
     steps:
       - name: Xcode Setup
@@ -75,8 +77,9 @@ jobs:
           set -x
           git clone https://github.com/CRKatri/trustcache
           cd trustcache
-          export CFLAGS="$CFLAGS -I$(brew --prefix openssl)/include -arch arm64"
-          export LDFLAGS="$LDFLAGS -L$(brew --prefix openssl)/lib -arch arm64"
+          HOST_ARCH=$(uname -m)
+          export CFLAGS="$CFLAGS -I$(brew --prefix openssl)/include -arch $HOST_ARCH"
+          export LDFLAGS="$LDFLAGS -L$(brew --prefix openssl)/lib -arch $HOST_ARCH"
           gmake -j$(sysctl -n hw.logicalcpu) OPENSSL=1
           sudo cp trustcache /opt/procursus/bin/
 
