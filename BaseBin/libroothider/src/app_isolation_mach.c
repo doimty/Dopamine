@@ -5,8 +5,29 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <libproc.h>
 
 extern int audit_token_to_pidversion(audit_token_t token);
+
+struct rh_proc_unique_info {
+    uint8_t uuid[16];
+    uint64_t uniqueid, parent_uniqueid;
+    int32_t pidversion;
+    uint32_t reserved2;
+    uint64_t reserved3, reserved4;
+};
+_Static_assert(sizeof(struct rh_proc_unique_info) == 56, "Unexpected PROC_PIDUNIQIDENTIFIERINFO layout");
+
+int rh_isolation_pidversion(pid_t pid)
+{
+    if (pid <= 0) return 0;
+    int saved_errno = errno;
+    struct rh_proc_unique_info info = {0};
+    int size = proc_pidinfo(pid, 17, 0, &info, sizeof(info));
+    int version = size == (int)sizeof(info) && info.pidversion > 0 ? info.pidversion : 0;
+    errno = saved_errno;
+    return version;
+}
 
 uint64_t rh_isolation_now_ns(void)
 {

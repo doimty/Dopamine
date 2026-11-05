@@ -43,6 +43,8 @@ struct rh_isolation_mach_reply {
 
 /* Caller and service share the machine's monotonic uptime clock, not wall time. */
 uint64_t rh_isolation_now_ns(void);
+// Userspace-only identity query; also linked into systemhook without kernel helpers.
+int rh_isolation_pidversion(pid_t pid);
 bool rh_isolation_request_cancelled(uint64_t deadline_ns, mach_port_t reply_right);
 int rh_isolation_mach_call(mach_port_t service, pid_t helper_pid, int helper_pidversion,
                           uint32_t operation, pid_t target, int target_pidversion,

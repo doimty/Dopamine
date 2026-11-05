@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <libproc.h>
+#include <limits.h>
 #include <stdatomic.h>
 #include <signal.h>
 #include <stdio.h>
@@ -30,18 +31,6 @@ static void abort_cleanup(int signo)
     signal(signo, SIG_DFL);
     raise(signo);
 }
-struct unique_info {
-    uint8_t uuid[16]; uint64_t uniqueid, parent_uniqueid;
-    int32_t pidversion; uint32_t reserved2; uint64_t reserved3, reserved4;
-};
-static int pidversion(pid_t pid)
-{
-    struct unique_info info = {0};
-    int size = proc_pidinfo(pid, 17, 0, &info, sizeof(info));
-    assert(size == (int)sizeof(info));
-    return info.pidversion;
-}
-
 struct fixture {
     mach_port_t port;
     dispatch_queue_t queue;
@@ -58,7 +47,7 @@ static int checked_fixture(const struct rh_isolation_mach_request *request,
 {
     struct fixture *fixture = opaque;
     atomic_fetch_add(&fixture->callback_count, 1);
-    if (pidversion(request->pid) != request->pidversion) return ESRCH;
+    if (rh_isolation_pidversion(request->pid) != request->pidversion) return ESRCH;
     int delay = atomic_load(&fixture->delay_ms);
     if (delay) usleep((useconds_t)delay * 1000);
     if (rh_isolation_request_cancelled(request->deadline_ns, right)) return ETIMEDOUT;
@@ -159,7 +148,12 @@ int main(void)
     int status;
     assert(waitpid(child, &status, WUNTRACED) == child && WIFSTOPPED(status));
     assert(fcntl(marker[0], F_SETFL, O_NONBLOCK) == 0);
-    int helper_version = pidversion(getpid()), child_version = pidversion(child);
+    errno = EDOM;
+    assert(rh_isolation_pidversion(0) == 0);
+    assert(rh_isolation_pidversion(-1) == 0);
+    assert(rh_isolation_pidversion(INT_MAX) == 0);
+    int helper_version = rh_isolation_pidversion(getpid()), child_version = rh_isolation_pidversion(child);
+    assert(helper_version > 0 && child_version > 0 && errno == EDOM);
     assert(rh_isolation_mach_call(MACH_PORT_NULL, getpid(), helper_version, RH_ISOLATION_PING, 0, 0, 20) == ENOTCONN);
 
     /* A port with an owner but no serving loop must never count as ready. */

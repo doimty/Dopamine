@@ -525,7 +525,7 @@ bool jbdIsolationHelperReady(void)
 int jbdAppIsolationRepair(pid_t pid)
 {
     if (getpid() != 1 || pid <= 1) return EPERM;
-    int targetVersion = proc_get_pidversion(pid);
+    int targetVersion = rh_isolation_pidversion(pid);
     if (targetVersion <= 0) return ESRCH;
     pid_t helper = 0;
     int helperVersion = 0;
