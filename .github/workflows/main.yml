@@ -41,6 +41,7 @@ jobs:
           {
             bash scripts/test-app-isolation.sh
             python3 scripts/test-update-contracts.py
+            python3 scripts/test-official-home.py
             python3 tests/test-release-verifier.py
             python3 scripts/test-app-isolation-integration.py --sanitizer address
             python3 worker/test_configuration_cache.py --sanitizer address
@@ -117,6 +118,7 @@ jobs:
             --ipa "./Application/doimty-Dopamine-${{ env.version }}.ipa" \
             --tipa "./Application/doimty-Dopamine-${{ env.version }}.tipa" \
             --commit "${{ github.sha }}" \
+            --require-official-home \
             --output release-manifest.json
 
       - name: Upload app isolation regression log

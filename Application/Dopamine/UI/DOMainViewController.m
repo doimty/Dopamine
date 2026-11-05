@@ -15,20 +15,11 @@
 #import "DOLogCrashViewController.h"
 #import <pthread.h>
 #import <sys/sysctl.h>
-#import <mach/mach_time.h>
 #import <libjailbreak/libjailbreak.h>
 
 @interface DOMainViewController ()
 
 @property DOJailbreakButton *jailbreakBtn;
-@property UIStackView *mainStack;
-@property UIView *contentView;
-@property UILabel *appBuildInfoLabel;
-@property UILabel *appBuildTimeLabel;
-@property UILabel *systemVersionLabel;
-@property UILabel *systemUptimeLabel;
-@property NSTimer *uptimeTimer;
-@property(nonatomic) BOOL informationVisible;
 @property NSArray<NSLayoutConstraint *> *jailbreakButtonConstraints;
 @property DOActionMenuButton *updateButton;
 @property(nonatomic) BOOL hideStatusBar;
@@ -43,25 +34,44 @@
     [self setupStack];
 }
 
-// 组合主页信息列、操作菜单与越狱按钮。
 -(void)setupStack
 {
-    self.contentView = [[UIView alloc] initWithFrame:self.view.bounds];
-    [self.view addSubview:self.contentView];
-    UIStackView *stackView = self.mainStack = [[UIStackView alloc] init];
+    UIStackView *stackView = [[UIStackView alloc] init];
     [stackView setAxis:UILayoutConstraintAxisVertical];
     [stackView setAlignment:UIStackViewAlignmentTrailing];
     [stackView setDistribution:UIStackViewDistributionEqualSpacing];
-    stackView.spacing = 16;
     [stackView setTranslatesAutoresizingMaskIntoConstraints:NO];
 
-    [self.contentView addSubview:stackView];
+    [self.view addSubview:stackView];
+
+
+    int statusBarHeight = fmax(15, [[UIApplication sharedApplication] keyWindow].safeAreaInsets.top - 20);
+
     [NSLayoutConstraint activateConstraints:@[
-        [stackView.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor],
-        [stackView.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor],
-        [stackView.topAnchor constraintEqualToAnchor:self.contentView.topAnchor],
-        [stackView.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor],
+        [stackView.centerYAnchor constraintEqualToAnchor:self.view.centerYAnchor constant:statusBarHeight],//-35
+        [stackView.heightAnchor constraintEqualToAnchor:self.view.heightAnchor multiplier:[DOGlobalAppearance isHomeButtonDevice] ? 0.78 : 0.73]
     ]];
+
+    if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPad)
+    {
+        NSLayoutConstraint *relativeWidthConstraint = [stackView.widthAnchor constraintEqualToAnchor:self.view.widthAnchor multiplier:0.8];
+        relativeWidthConstraint.priority = UILayoutPriorityDefaultHigh;
+        NSLayoutConstraint *maxWidthConstraint = [stackView.widthAnchor constraintLessThanOrEqualToConstant:UI_IPAD_MAX_WIDTH];
+        maxWidthConstraint.priority = UILayoutPriorityRequired;
+
+        [NSLayoutConstraint activateConstraints:@[
+            relativeWidthConstraint,
+            maxWidthConstraint,
+            [stackView.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor]
+        ]];
+    }
+    else
+    {
+        [NSLayoutConstraint activateConstraints:@[
+            [stackView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor constant:UI_PADDING],
+            [stackView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-UI_PADDING],
+        ]];
+    }
 
     //Header
     DOHeaderView *headerView = [[DOHeaderView alloc] initWithImage: [UIImage imageNamed:@"Dopamine"] subtitles: @[
@@ -70,16 +80,6 @@
     ]];
     
     [stackView addArrangedSubview:headerView];
-    // 版本与注入模式、应用构建信息、运行时长共用作者行的边界与行距。
-    self.systemVersionLabel = [self addInformationRowToHeader:headerView titleKey:@"System version: %@"];
-    self.appBuildInfoLabel = [self addInformationRowToHeader:headerView titleKey:@"Build version: %@"];
-    self.appBuildTimeLabel = [self addInformationRowToHeader:headerView titleKey:@"Build time: %@"];
-    self.systemUptimeLabel = [self addInformationRowToHeader:headerView titleKey:@"System boot time: %@"];
-    NSString *issueNotice = [@"\n" stringByAppendingString:DOLocalizedString(@"If you encounter any issues, please reproduce them using the official version before reporting.")];
-    [headerView addSubtitle:[DOGlobalAppearance secondarySubtitleString:issueNotice]];
-    [self refreshSystemInformation];
-    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(resumeSystemInformationUpdates) name:UIApplicationDidBecomeActiveNotification object:nil];
-    [NSNotificationCenter.defaultCenter addObserver:self selector:@selector(stopUptimeTimer) name:UIApplicationWillResignActiveNotification object:nil];
 
     [NSLayoutConstraint activateConstraints:@[
         [headerView.leadingAnchor constraintEqualToAnchor:stackView.leadingAnchor constant:5],
@@ -118,7 +118,7 @@
     [buttonPlaceHolder setTranslatesAutoresizingMaskIntoConstraints:NO];
     [stackView addArrangedSubview:buttonPlaceHolder];
     [NSLayoutConstraint activateConstraints:@[
-        [buttonPlaceHolder.heightAnchor constraintEqualToConstant:60],
+        [buttonPlaceHolder.heightAnchor constraintEqualToConstant:60]
     ]];
     
     //Jailbreak Button
@@ -134,32 +134,16 @@
         jailbreakButtonImage = [UIImage systemImageNamed:@"lock.slash" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]];
     
     self.jailbreakBtn = [[DOJailbreakButton alloc] initWithAction: [UIAction actionWithTitle:jailbreakButtonTitle image:jailbreakButtonImage identifier:@"jailbreak" handler:^(__kindof UIAction * _Nonnull action) {
-
-
-/********************************** roothide specific ************************************/
-        if(otherJailbreakActived(false)) {
-            UIAlertController *alertController = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Error") message:DOLocalizedString(@"Your device currently has another jailbreak activated, please reboot device.") preferredStyle:UIAlertControllerStyleAlert];
-            UIAlertAction *rebootAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Close") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-                //exit(0);
-            }];
-            [alertController addAction:rebootAction];
-            [self presentViewController:alertController animated:YES completion:nil];
+        // Keep the RootHide activation guard; it is independent of homepage styling.
+        if (otherJailbreakActived(false)) {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Error")
+                message:DOLocalizedString(@"Other_Jailbreak_Active_Message") preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Close")
+                style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:alert animated:YES completion:nil];
             return;
         }
-/********************************** roothide specific ************************************/
-
-
         [actionView hide];
-        // 移出缩放容器后固定动画起点，避免日志初始化布局时位置归零。
-        CGRect buttonFrame = [self.jailbreakBtn convertRect:self.jailbreakBtn.bounds toView:self.view];
-        [NSLayoutConstraint deactivateConstraints:self.jailbreakButtonConstraints];
-        [self.view addSubview:self.jailbreakBtn];
-        [NSLayoutConstraint activateConstraints:(self.jailbreakButtonConstraints = @[
-            [self.jailbreakBtn.leftAnchor constraintEqualToAnchor:self.view.leftAnchor constant:CGRectGetMinX(buttonFrame)],
-            [self.jailbreakBtn.topAnchor constraintEqualToAnchor:self.view.topAnchor constant:CGRectGetMinY(buttonFrame)],
-            [self.jailbreakBtn.widthAnchor constraintEqualToConstant:CGRectGetWidth(buttonFrame)],
-            [self.jailbreakBtn.heightAnchor constraintEqualToConstant:CGRectGetHeight(buttonFrame)]
-        ])];
         [self.jailbreakBtn expandButton: self.jailbreakButtonConstraints];
 
         self.updateButton.userInteractionEnabled = NO;
@@ -173,7 +157,7 @@
     }]];
     self.jailbreakBtn.enabled = !isJailbroken && isSupported;
 
-    [self.contentView addSubview:self.jailbreakBtn];
+    [self.view addSubview:self.jailbreakBtn];
 
     [NSLayoutConstraint activateConstraints:(self.jailbreakButtonConstraints = @[
         [self.jailbreakBtn.leadingAnchor constraintEqualToAnchor:stackView.leadingAnchor],
@@ -198,24 +182,6 @@
     });
 }
 
-// 按安全区与内容自然尺寸计算统一比例，同步缩放文字、图标、按钮和间距。
-- (void)viewDidLayoutSubviews
-{
-    [super viewDidLayoutSubviews];
-    if (self.jailbreakBtn.didExpand) return;
-    CGRect safeFrame = self.view.safeAreaLayoutGuide.layoutFrame;
-    BOOL isPad = UIDevice.currentDevice.userInterfaceIdiom == UIUserInterfaceIdiomPad;
-    CGFloat width = isPad ? MIN(safeFrame.size.width * 0.8, UI_IPAD_MAX_WIDTH) : MAX(375, safeFrame.size.width) - UI_PADDING * 2;
-    CGFloat availableHeight = MIN(safeFrame.size.height - 24, self.view.bounds.size.height * ([DOGlobalAppearance isHomeButtonDevice] ? 0.78 : 0.73));
-    if (width <= 0 || availableHeight <= 0) return;
-    CGSize size = [self.mainStack systemLayoutSizeFittingSize:CGSizeMake(width, 0) withHorizontalFittingPriority:UILayoutPriorityRequired verticalFittingPriority:UILayoutPriorityFittingSizeLevel];
-    CGFloat height = MAX(size.height, availableHeight);
-    CGFloat scale = MIN(1, MIN((safeFrame.size.width - UI_PADDING * 2) / width, availableHeight / height));
-    self.contentView.bounds = CGRectMake(0, 0, width, height);
-    self.contentView.center = CGPointMake(CGRectGetMidX(safeFrame), CGRectGetMidY(safeFrame));
-    self.contentView.transform = CGAffineTransformMakeScale(scale, scale);
-}
-
 - (NSString *)jailbreakButtonTitle
 {
     BOOL isJailbroken = [[DOEnvironmentManager sharedManager] isJailbroken];
@@ -233,97 +199,10 @@
     return jailbreakButtonTitle;
 }
 
-// 读取含休眠时间的系统运行时长，不受修改日期或定时器延迟影响。
-- (NSString *)systemUptimeDescription
-{
-    static mach_timebase_info_data_t timebase;
-    static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{ mach_timebase_info(&timebase); });
-    if (timebase.denom == 0) return DOLocalizedString(@"Unknown");
-    uint64_t seconds = (uint64_t)((double)mach_continuous_time() * timebase.numer / timebase.denom / NSEC_PER_SEC);
-    return [NSString stringWithFormat:DOLocalizedString(@"Uptime_Format"),
-        (unsigned long long)(seconds / 86400), (unsigned long long)(seconds / 3600 % 24),
-        (unsigned long long)(seconds / 60 % 60), (unsigned long long)(seconds % 60)];
-}
-
-// 将包内记录的实际构建时间转换为设备当前时区。
-- (NSString *)appBuildTimeDescription
-{
-    NSTimeInterval timestamp = [[[NSBundle mainBundle] objectForInfoDictionaryKey:@"DOBuildTimestamp"] doubleValue];
-    if (timestamp <= 0) return DOLocalizedString(@"Unknown");
-    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
-    formatter.locale = [[NSLocale alloc] initWithLocaleIdentifier:@"en_US_POSIX"];
-    formatter.timeZone = [NSTimeZone localTimeZone];
-    formatter.dateFormat = @"yyyy-MM-dd HH:mm:ss";
-    return [formatter stringFromDate:[NSDate dateWithTimeIntervalSince1970:timestamp]];
-}
-
-// 从本地化格式生成独立标题，动态内容由返回的标签负责显示。
-- (UILabel *)addInformationRowToHeader:(DOHeaderView *)header titleKey:(NSString *)key
-{
-    NSString *title = [[NSString stringWithFormat:DOLocalizedString(key), @""] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
-    return [header addInformationRowWithTitle:[DOGlobalAppearance secondarySubtitleString:title]];
-}
-
-// 返回主页或切回应用时刷新系统版本、注入模式与应用构建信息。
-- (void)refreshSystemInformation
-{
-    DOEnvironmentManager *environment = [DOEnvironmentManager sharedManager];
-    NSString *versionAndMode = [NSString stringWithFormat:@"%@ (%@)", environment.systemVersion ?: UIDevice.currentDevice.systemVersion, environment.injectionModeDescription];
-    self.systemVersionLabel.attributedText = [DOGlobalAppearance secondarySubtitleString:versionAndMode];
-    self.appBuildInfoLabel.attributedText = [DOGlobalAppearance secondarySubtitleString:environment.appVersion ?: DOLocalizedString(@"Unknown")];
-    self.appBuildTimeLabel.attributedText = [DOGlobalAppearance secondarySubtitleString:[self appBuildTimeDescription]];
-    [self refreshSystemUptime];
-}
-
-// 每次直接读取系统时钟刷新时长，避免逐秒累加造成误差。
-- (void)refreshSystemUptime
-{
-    self.systemUptimeLabel.attributedText = [DOGlobalAppearance secondarySubtitleString:[self systemUptimeDescription]];
-}
-
-// 仅在主页可见且应用活跃时每秒刷新，滚动期间也保持计时。
-- (void)resumeSystemInformationUpdates
-{
-    if (!self.informationVisible) return;
-    [self refreshSystemInformation];
-    if (self.uptimeTimer || UIApplication.sharedApplication.applicationState != UIApplicationStateActive) return;
-    __weak typeof(self) weakSelf = self;
-    self.uptimeTimer = [NSTimer timerWithTimeInterval:1 repeats:YES block:^(NSTimer *timer) {
-        [weakSelf refreshSystemUptime];
-    }];
-    [[NSRunLoop mainRunLoop] addTimer:self.uptimeTimer forMode:NSRunLoopCommonModes];
-}
-
-// 离开主页或进入后台时停止无用刷新。
-- (void)stopUptimeTimer
-{
-    [self.uptimeTimer invalidate];
-    self.uptimeTimer = nil;
-}
-
-// 显示主页时刷新信息及越狱按钮状态。
 - (void)viewWillAppear:(BOOL)animated
 {
     [super viewWillAppear:animated];
-    self.informationVisible = YES;
-    [self resumeSystemInformationUpdates];
     [self.jailbreakBtn.button setTitle:[self jailbreakButtonTitle] forState:UIControlStateNormal];
-}
-
-// 页面隐藏后停止计时，返回时按系统时钟恢复。
-- (void)viewWillDisappear:(BOOL)animated
-{
-    [super viewWillDisappear:animated];
-    self.informationVisible = NO;
-    [self stopUptimeTimer];
-}
-
-// 释放定时器及通知观察，避免页面退出后继续刷新。
-- (void)dealloc
-{
-    [_uptimeTimer invalidate];
-    [NSNotificationCenter.defaultCenter removeObserver:self];
 }
 
 - (void)startJailbreak
@@ -375,7 +254,7 @@
         [jailbreaker runWithError:&error didRemoveJailbreak:&didRemove showLogs:&showLogs];
         dispatch_async(dispatch_get_main_queue(), ^{
             if (error && showLogs) {
-                [[DOUIManager sharedInstance] sendLog:[NSString stringWithFormat:@"Jailbreak failed with error: %@", error] debug:NO];
+                [[DOUIManager sharedInstance] sendLog:[NSString stringWithFormat:DOLocalizedString(@"Jailbreak_Failed_With_Error"), error] debug:NO];
                 [self.navigationController pushViewController:[[DOLogCrashViewController alloc] initWithTitle:[error localizedDescription]] animated:YES];
             }
             else if (error && !showLogs) {
@@ -419,9 +298,7 @@
 
     if (environmentUpdate)
     {
-/************************************* roothide specfic ***********************************/
         releaseFrom = [[DOEnvironmentManager sharedManager] jailbrokenVersionRootHide];
-/************************************* roothide specfic ***********************************/
         releaseTo = [[DOUIManager sharedInstance] getLaunchedReleaseTag];
     }
 
@@ -430,15 +307,12 @@
     }] chevron:NO];
 
     self.updateButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.contentView addSubview:self.updateButton];
-
-    // 为更新入口预留间距，随内容一起参与小屏布局。
-    [self.mainStack setCustomSpacing:[DOGlobalAppearance isHomeButtonDevice] ? 50 : 60 afterView:self.mainStack.arrangedSubviews[1]];
+    [self.view addSubview:self.updateButton];
 
     [NSLayoutConstraint activateConstraints:@[
-        [self.updateButton.centerXAnchor constraintEqualToAnchor:self.contentView.centerXAnchor],
+        [self.updateButton.centerXAnchor constraintEqualToAnchor:self.view.centerXAnchor],
         [self.updateButton.heightAnchor constraintEqualToConstant:30],
-        [self.updateButton.bottomAnchor constraintEqualToAnchor:self.mainStack.arrangedSubviews.lastObject.topAnchor constant:[DOGlobalAppearance isHomeButtonDevice] ? -10 : -20]
+        [self.updateButton.bottomAnchor constraintEqualToAnchor:self.jailbreakBtn.topAnchor constant:[DOGlobalAppearance isHomeButtonDevice] ? -10 : -20]
     ]];
 
     [self.updateButton setTransform:CGAffineTransformMakeTranslation(0, 25)];

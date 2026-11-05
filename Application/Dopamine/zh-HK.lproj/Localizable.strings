@@ -1,93 +1,95 @@
-"Credits_Made_By" = "作者：opa334, évelyne";
+"Credits_Made_By" = "作者：opa334, évelyne (ElleKit)";
 
 // Log
 "Status_Title_Jailbreaking" = "正在越獄";
-"Log_Error" = "失敗";
+"Log_Error" = "發生錯誤";
 
 // Jailbreak Button
 "Button_Jailbreak_Title" = "越獄";
 "Status_Title_Jailbroken" = "已越獄";
-/*Unsupported*/
+"Unsupported" = "不支援";
 
 // Action Menu
-"Menu_Settings_Title" = "設置";
-"Menu_Restart_SpringBoard_Title" = "註銷";
-"Menu_Reboot_Userspace_Title" = "用戶空間重啟";
+"Menu_Settings_Title" = "設定";
+"Menu_Restart_SpringBoard_Title" = "重啟 SpringBoard";
+"Menu_Reboot_Userspace_Title" = "重啟用戶空間";
 "Menu_Credits_Title" = "關於";
 
 // Updating
 "Button_Update" = "更新";
-"Button_Update_Available" = "可更新";
+"Button_Update_Available" = "有可用更新";
 "Button_Update_Environment" = "更新環境";
 
 // Update View
-"Update_Status_Downloading" = "正在下載更新…";
-"Update_Status_Subtitle_Please_Wait" = "請等待完成下載";
-"Update_Status_Installing" = "正在安裝更新…";
+"Update_Status_Downloading" = "正在下載更新...";
+"Update_Status_Subtitle_Please_Wait" = "請等待檔案下載完成";
+"Update_Status_Installing" = "正在安裝更新...";
 "Update_Status_Subtitle_Restart_Soon" = "裝置即將重新啟動";
-"Title_Changelog" = "變更日誌";
-"Changelog_Unavailable_Text" = "變更日誌不可用";
+"Title_Changelog" = "更新日誌";
+"Changelog_Unavailable_Text" = "暫無更新日誌";
 
 // Removed Jailbreak Alert
-/*Removed_Jailbreak_Alert_Title*/
-/*Removed_Jailbreak_Alert_Message*/
-/*Button_Close*/
+"Removed_Jailbreak_Alert_Title" = "移除越獄";
+"Removed_Jailbreak_Alert_Message" = "已移除越獄，建議重新啟動裝置。";
+"Button_Close" = "關閉";
 
 // Error View
-/*Button_Share*/
-/*Button_Reboot*/
+"Button_Share" = "分享";
+"Button_Reboot" = "重新啟動";
 
-// Settings Toggles
-"Settings_Tweak_Injection" = "插件注入";
-"Settings_iDownload" = "iDownload (开发商终端)";
+// Settings Options
+"Settings_Tweak_Injection" = "外掛注入";
+"Settings_iDownload" = "iDownload（開發者終端）";
 "Settings_Verbose_Logs" = "詳細日誌";
-/*Settings_Apps_JIT*/
+"Settings_Apps_JIT" = "允許 App 使用 JIT";
+"Settings_Jetsam_Multiplier" = "Jetsam 附加記憶體";
 
 // Settings Buttons
-"Button_Remove_Jailbreak" = "清除越獄";
+"Button_Remove_Jailbreak" = "移除越獄";
 "Button_Hide_Jailbreak" = "隱藏越獄";
-"Button_Unhide_Jailbreak" = "解除隱藏越獄";
-/*Button_Refresh_Jailbreak_Apps*/
-"Button_Reinstall_Package_Managers" = "重新安裝包管理器（越獄商店）";
-/*Button_Change_Mobile_Password*/
+"Button_Unhide_Jailbreak" = "取消隱藏越獄";
+"Button_Refresh_Jailbreak_Apps" = "重新整理越獄 App";
+"Button_Reinstall_Package_Managers" = "重新安裝套件管理器";
+"Button_Change_Mobile_Password" = "修改「mobile」密碼";
 
 // Settings Hints
-"Hint_Hide_Jailbreak" = "「隱藏越獄」將在下次越獄前臨時移除越獄相關的文件";
+"Hint_Hide_Jailbreak" = "「隱藏越獄」將在下次越獄前移除部分可能導致越獄偵測的檔案。";
 /*Hint_Hide_Jailbreak_Jailbroken*/
-/*Section_Jailbreak_Settings*/
-/*Section_Actions*/
-/*Section_Customization*/
-/*Section_Exploits*/
+"Section_Jailbreak_Settings" = "越獄設定";
+"Section_Actions" = "操作";
+"Section_Customization" = "自訂";
+"Section_Exploits" = "漏洞利用";
+"Jetsam_Description" = "為注入程序的有限記憶體上限增加「程序附加量 + 所選 MB」。預設附加量：一般程序 10 MB、SpringBoard 1024 MB、xxtouch 48 MB、thermalmonitord 16 MB。關閉時保留原上限，原本無限額的程序仍無限額。各程序附加量由 cn.zqbb.jetsam.addend.plist 配置。";
 
 // Settings Alerts
-/*Alert_Tweak_Injection_Toggled_Title*/
-"Alert_Tweak_Injection_Toggled_Body" = "為使變更生效需用戶空間重啟，即可執行否？";
-/*Alert_Tweak_Injection_Toggled_Reboot_Now*/
-/*Alert_Tweak_Injection_Toggled_Reboot_Later*/
-"Alert_Remove_Jailbreak_Title" = "清除越獄";
-"Alert_Remove_Jailbreak_Pressed_Body" = "清除越獄將移除所有和越獄相關的文件，但將保留普通 App、文件、數據。請注意，此操作無法撤銷。確認清除越獄嗎？";
-/*Alert_Remove_Jailbreak_Enabled_Body*/
-/*Alert_Change_Mobile_Password_Body*/
-/*Password_Placeholder*/
-/*Repeat_Password_Placeholder*/
+"Alert_Tweak_Injection_Toggled_Title" = "需要重啟用戶空間";
+"Alert_Tweak_Injection_Toggled_Body" = "需要重啟用戶空間才能套用更改，現在重啟嗎？";
+"Alert_Tweak_Injection_Toggled_Reboot_Now" = "立即重啟";
+"Alert_Tweak_Injection_Toggled_Reboot_Later" = "稍後重啟";
+"Alert_Remove_Jailbreak_Title" = "移除越獄";
+"Alert_Remove_Jailbreak_Pressed_Body" = "「移除越獄」將移除所有與越獄相關的檔案，一般的 App、文件與資料不受影響。此操作無法復原，確定要繼續嗎？";
+"Alert_Remove_Jailbreak_Enabled_Body" = "「移除越獄」將在下次越獄時移除所有與越獄相關的檔案，一般的 App、文件與資料不受影響。此操作無法復原，確定要繼續嗎？";
+"Alert_Change_Mobile_Password_Body" = "將修改裝置上「mobile」用戶的密碼，sudo 指令使用此密碼認證。如需設定「root」密碼，請在終端機執行「sudo passwd root」。";
+"Password_Placeholder" = "密碼";
+"Repeat_Password_Placeholder" = "再次輸入";
 /*Password_Auth_Required*/
-/*Button_Change*/
+"Button_Change" = "修改";
 "Button_Cancel" = "取消";
-/*Button_Continue*/
+"Button_Continue" = "繼續";
 
 // Duplicate Apps Errors
-/*Duplicate_Apps_Error_Dopamine_App*/
-/*Duplicate_Apps_Error_User_App*/
-/*Duplicate_Apps_Error_Icon_Cache*/
+"Duplicate_Apps_Error_Dopamine_App" = "Dopamine 的 App 目錄中有多個識別符為「%@」的 App（目錄：「%@」），操作已停止。";
+"Duplicate_Apps_Error_User_App" = "以下識別符的 App 同時出現在系統與 Dopamine 的 App 目錄中：%@（目錄：「%@」），操作已停止。";
+"Duplicate_Apps_Error_Icon_Cache" = "識別符為「%@」的 App 位於 Dopamine 的 App 目錄「%@」，但圖示快取指向另一路徑「%@」，操作已停止。";
 
 // Settings Lists
-/*Theme*/
-/*Kernel Exploit*/
-/*PPL Bypass*/
-/*SPTM Bypass*/
-/*PAC Bypass*/
-/*None*/
-/*Recommended*/
+"Theme" = "主題";
+"Kernel Exploit" = "核心漏洞";
+"PPL Bypass" = "PPL 繞過";
+"SPTM Bypass" = "SPTM 繞過";
+"PAC Bypass" = "PAC 繞過";
+"None" = "無";
+"Recommended" = "建議";
 
 // DarkSword Workaround
 /*Respring_Required*/
@@ -98,65 +100,70 @@
 
 // Credits
 "Credits_Button_Discord" = "Discord";
-"Credits_Button_License" = "許可證";
+"Credits_Button_License" = "授權條款";
 "Credits_Button_Source_Code" = "原始碼";
 
 // Logs
 "Initializing Environment" = "初始化環境";
-/*Initializing Protection*/
-/*Loading BaseBin TrustCache*/
-/*Applying Bind Mount*/
+"Initializing Protection" = "初始化保護";
+"Loading BaseBin TrustCache" = "載入 BaseBin 信任快取";
+"Applying Bind Mount" = "套用綁定掛載";
 /*Rebuilding Icon Cache*/
-/*Removing Jailbreak*/
-/*Elevating Privileges*/
-/*Cleaning Up Exploits*/
-/*Building Phys R/W Primitive*/
-/*Rebooting Userspace*/
-"Patchfinding" = "Patchfinding";
-/*Exploiting Kernel (%@)*/
-/*Bypassing PAC (%@)*/
-/*Bypassing PPL (%@)*/
-/*Bypassing SPTM (%@)*/
+"Removing Jailbreak" = "移除越獄";
+"Elevating Privileges" = "提升權限";
+"Cleaning Up Exploits" = "清理利用環境";
+"Building Phys R/W Primitive" = "建立實體讀寫原語";
+"Rebooting Userspace" = "重啟用戶空間";
+"Patchfinding" = "尋找核心偏移";
+"Exploiting Kernel (%@)" = "正在利用核心 (%@)";
+"Bypassing PAC (%@)" = "正在繞過 PAC (%@)";
+"Bypassing PPL (%@)" = "正在繞過 PPL (%@)";
+"Bypassing SPTM (%@)" = "正在繞過 SPTM (%@)";
 
 // Package Manager selection
-"Status_Title_Select_Package_Managers" = "選定包管理器（越獄商店）";
-"Select_Package_Managers_Install_Message" = "若不確定如何選擇，請使用 Sileo";
+"Status_Title_Select_Package_Managers" = "選擇套件管理器";
+"Select_Package_Managers_Install_Message" = "不確定選哪個時，選 Sileo 就好。";
 "Continue" = "繼續";
 
-
 "Injection_Mode_Waiting" = "等待越獄";
-
 "Injection_Mode_Whitelist" = "白名單";
-
 "Injection_Mode_Blacklist" = "黑名單";
+"Sileo_Open_Failed" = "無法開啟 Sileo，請先安裝 Sileo 並重新整理軟體源。";
+"Jetsam_Disabled" = "關閉";
+"Install Whitelist App" = "安裝白名單 App";
+"Install Mount App" = "安裝掛載 App";
 
-"Sileo_Open_Failed" = "Could not open Sileo. Install Sileo and refresh its package sources first.";
-
-"Jetsam_Disabled" = "Disabled";
-
-"Settings_Jetsam_Multiplier" = "Jetsam Additional Memory";
-
-"Jetsam_Description" = "Adds the selected MB amount to each injected process’s configured allowance (10 MB by default; SpringBoard 1024 MB, xxtouch 48 MB, thermalmonitord 16 MB). Disabled leaves limits unchanged. Unlimited limits remain unlimited. Process allowances are stored in cn.zqbb.jetsam.addend.plist.";
-
-"Install Whitelist App" = "Install Whitelist App";
-
-"Install Mount App" = "Install Mount App";
-
-"If you encounter any issues, please reproduce them using the official version before reporting." = "如有問題，請使用官方版本重現後再報告。";
-
-// 主頁系統資訊
-"System version: %@" = "系統版本：%@";
-"System boot time: %@" = "運作時間：%@";
-"Unknown" = "未知";
-
-"Uptime_Format" = "%llu天 %02llu:%02llu:%02llu";
-"Build version: %@" = "編譯版本：%@";
-"Build time: %@" = "編譯時間：%@";
+// 补充的界面与兼容性文案
+"Settings_Allow_Old_arm64e_ABI_Libraries" = "允許舊版 arm64e ABI 程式庫";
+"Hint_Hide_Jailbreak_Jailbroken" = "「隱藏越獄」會暫時停用越獄以繞過部分越獄偵測。它並不能隱藏所有痕跡，但可以讓裝置接近剛重新啟動、尚未越獄時的狀態。此功能不能替代 RootHide，且可能引發問題，請自行斟酌使用。";
+"Section_Boot_Logo" = "啟動 Logo";
+"Enabled" = "已啟用";
+"Custom_Boot_Logo" = "自訂啟動 Logo";
+"Select_Image" = "選擇圖片";
+"Password_Auth_Required" = "修改 mobile 密碼前需要驗證身份。";
+"Respring_Required" = "需要重啟 SpringBoard";
+"Respring_Required_Message" = "所選核心漏洞需要建立連續記憶體映射，此裝置只能透過重啟 SpringBoard 的特殊方式實現。完成後請重新開啟 Dopamine，再次點按「越獄」。";
+"Respring_Required_Notice_A8" = "在你的裝置上，此方式不一定每次都成功，可能需要多次重複，直到不再出現此提示。";
+"Apply_Workaround" = "套用方案";
+"Respring_Cancel" = "取消";
+"Rebuilding Icon Cache" = "重建圖示快取";
+"Settings_Title" = "設定";
+"Settings_TrollStoreLite_Fix" = "TrollStoreLite 修復";
+"Error" = "錯誤";
+"OK" = "好";
+"Warning" = "警告";
+"Other_Jailbreak_Active_Message" = "偵測到裝置目前已啟用其他越獄，請重新啟動裝置。";
+"Checking For Duplicate Apps" = "正在檢查重複 App";
+"Hiding Jailbreak" = "隱藏越獄";
+"Done" = "完成";
+"Jailbreak_Failed_With_Error" = "越獄失敗：%@";
+"Setting_Apply_Failed_Message" = "無法套用此設定，請更新越獄環境後重試。";
+"Your device currently has another jailbreak activated, please reboot device." = "偵測到裝置目前已啟用其他越獄，請重新啟動裝置。";
 
 // App isolation & roothide compatibility
 "Checking_For_Duplicate_Apps" = "正在檢查重複 App";
-"Hiding_Jailbreak" = "隱藏越獄環境";
-"Enable_Dyld_Patch" = "啟用 dyld 修補";
+"Hiding_Jailbreak" = "隱藏越獄";
+"Enable_Dyld_Patch" = "dyld 修補";
 "Dyld_Patch_Spinlock_Fix" = "dyld 修補（Spinlock 修復）";
-"Spinlock_Fix_Warning" = "啟用 Spinlock 修復後，黑名單 App 的擴展將被停用；當黑名單 App 在前台或背景執行時，也可能觸發 Spinlock panic。\n\n你可以先在 Choicy 中關閉該 App 的外掛注入（Spinlock 修復仍然有效），如果問題仍未解決，再將該 App 加入黑名單。";
-"Settings_Spinlock_Isolation" = "黑名單應用 Spinlock 隔離";
+"Spinlock_Fix_Warning" = "啟用 Spinlock 修復後，黑名單 App 的擴充功能會被停用；黑名單 App 在前景或背景執行時也可能觸發 Spinlock panic。\n\n可以先在 Choicy 中關閉該 App 的外掛注入（Spinlock 修復仍然有效），如果問題依舊，再把該 App 加入黑名單。";
+"Settings_Spinlock_Isolation" = "黑名單 Spinlock 隔離";
