@@ -95,15 +95,13 @@ static const BOOL DOVersionUpdateCheckEnabled = NO;
 
 - (BOOL)environmentUpdateAvailable
 {
-    if (![[DOEnvironmentManager sharedManager] jailbrokenVersion])
-        return NO;
+    DOEnvironmentManager *environment = [DOEnvironmentManager sharedManager];
+    NSString *installedBase = environment.jailbrokenVersion;
+    if (!installedBase) return NO;
 
-/********************************************** roothide specfic ***********************************/
-    NSString *jailbrokenVersion = [[DOEnvironmentManager sharedManager] jailbrokenVersionRootHide];
-/********************************************** roothide specfic ***********************************/
-    NSString *launchedVersion = [self getLaunchedReleaseTag];
-    
-    return [launchedVersion numericalVersionRepresentation] > [jailbrokenVersion numericalVersionRepresentation];
+    NSString *bundledVersion = [NSBundle.mainBundle objectForInfoDictionaryKey:@"CFBundleShortVersionString"];
+    return DOEnvironmentVersionNeedsUpdate(bundledVersion, installedBase,
+                                           environment.jailbrokenVersionRootHide);
 }
 
 - (bool)launchedReleaseNeedsManualUpdate

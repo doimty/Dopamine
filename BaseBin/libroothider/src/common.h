@@ -42,6 +42,15 @@ bool isBlacklistedPath(const char* path);
 bool appSpinlockIsolationRequested(const char *path);
 bool appSpinlockIsolationOptedOut(const char *path);
 
+// Effective blacklist and opt-out share one retained RootHideConfig snapshot.
+// Main-executable eligibility is independent: helpers keep their old blacklist.
+struct roothide_app_spawn_policy {
+    bool blacklisted;
+    bool verified_main_executable;
+    bool isolation_opted_out;
+};
+struct roothide_app_spawn_policy roothide_get_app_spawn_policy(const char *path);
+
 bool isBlacklistedToken(audit_token_t* token);
 bool isBlacklistedPid(pid_t pid);
 

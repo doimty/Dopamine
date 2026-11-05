@@ -8,8 +8,10 @@
 #include <sys/param.h>
 
 #include <libjailbreak/libjailbreak.h>
+#include <libjailbreak/jbserver_domains.h>
 #include "jailbreakd.h"
 #include "app_isolation_reply.h"
+#include "app_isolation_mach.h"
 #include <errno.h>
 #include "common.h"
 #include "log.h"
@@ -36,12 +38,115 @@ static bool __firstLoad = false;
 static bool __jailbreakd_initialized = false;
 static void (^__bootstrap_msg_handler)(xpc_object_t);
 
+/* Protected only across local bookkeeping; never hold this lock during a request. */
+static pthread_mutex_t isolationStateLock = PTHREAD_MUTEX_INITIALIZER;
+static mach_port_t isolationService = MACH_PORT_NULL;
+static pid_t isolationExpectedPid;
+static int isolationHelperPidversion;
+static uint64_t isolationGeneration;
+static bool isolationVerified;
+
+static void isolation_clear_locked(void)
+{
+    if (MACH_PORT_VALID(isolationService)) mach_port_deallocate(mach_task_self(), isolationService);
+    isolationService = MACH_PORT_NULL;
+    isolationHelperPidversion = 0;
+    isolationVerified = false;
+    isolationGeneration++;
+}
+
+static void isolation_invalidate_generation(uint64_t generation, bool retire)
+{
+    pthread_mutex_lock(&isolationStateLock);
+    if (isolationGeneration == generation) {
+        isolationVerified = false;
+        if (retire) isolation_clear_locked();
+    }
+    pthread_mutex_unlock(&isolationStateLock);
+}
+
+/* Optional capability attached to the existing helper check-in. Older servers
+ * ignore this field and still complete the ordinary check-in. */
+int jbdRegisterIsolationHelper(audit_token_t *token, xpc_object_t capability)
+{
+    if (!token || !capability || xpc_get_type(capability) != XPC_TYPE_DICTIONARY) return EINVAL;
+    pid_t pid = audit_token_to_pid(*token);
+    extern int audit_token_to_pidversion(audit_token_t);
+    int pidversion = audit_token_to_pidversion(*token);
+    int result = EPERM;
+    if (audit_token_to_euid(*token) == 0 && pid > 1 && pidversion > 0 &&
+        xpc_dictionary_get_uint64(capability, "isolation-protocol") == RH_ISOLATION_MACH_VERSION) {
+        mach_port_t port = xpc_dictionary_copy_mach_send(capability, "isolation-port");
+        mach_port_type_t type = 0;
+        if (MACH_PORT_VALID(port) && mach_port_type(mach_task_self(), port, &type) == KERN_SUCCESS &&
+            (type & MACH_PORT_TYPE_SEND)) {
+            pthread_mutex_lock(&isolationStateLock);
+            if (pid == isolationExpectedPid) {
+                isolation_clear_locked();
+                isolationService = port;
+                isolationHelperPidversion = pidversion;
+                port = MACH_PORT_NULL;
+                result = 0;
+            }
+            pthread_mutex_unlock(&isolationStateLock);
+        }
+        if (MACH_PORT_VALID(port)) mach_port_deallocate(mach_task_self(), port);
+    }
+    return result;
+}
+
+mach_port_t jbdCheckinWithIsolation(mach_port_t isolation_port)
+{
+    xpc_object_t args = xpc_dictionary_create_empty();
+    if (MACH_PORT_VALID(isolation_port)) {
+        xpc_object_t capability = xpc_dictionary_create_empty();
+        xpc_dictionary_set_uint64(capability, "isolation-protocol", RH_ISOLATION_MACH_VERSION);
+        xpc_dictionary_set_mach_send(capability, "isolation-port", isolation_port);
+        xpc_dictionary_set_value(args, "isolation-capability", capability);
+        xpc_release(capability);
+    }
+    xpc_object_t reply = jbserver_xpc_send(JBS_DOMAIN_ROOTHIDE, JBS_ROOTHIDE_JAILBREAKD_CHECKIN, args);
+    xpc_release(args);
+    mach_port_t port = MACH_PORT_NULL;
+    if (reply) {
+        if (xpc_dictionary_get_int64(reply, "result") == 0) {
+            xpc_object_t object = xpc_dictionary_get_value(reply, "port");
+            if (object) port = xpc_mach_recv_extract_right(object);
+        }
+        xpc_release(reply);
+    }
+    return port;
+}
+
+static mach_port_t isolation_copy_service(bool require_verified, pid_t *helper,
+                                          int *pidversion, uint64_t *generation)
+{
+    if (getpid() != 1 || __firstLoad || !__jailbreakd_initialized) return MACH_PORT_NULL;
+    /* A concurrent publication must not make a launchd spawn wait for the lock. */
+    if (pthread_mutex_trylock(&isolationStateLock) != 0) return MACH_PORT_NULL;
+    mach_port_t port = MACH_PORT_NULL;
+    if ((!require_verified || isolationVerified) && MACH_PORT_VALID(isolationService) &&
+        isolationExpectedPid > 1 && isolationHelperPidversion > 0 &&
+        mach_port_mod_refs(mach_task_self(), isolationService, MACH_PORT_RIGHT_SEND, 1) == KERN_SUCCESS) {
+        port = isolationService;
+        *helper = isolationExpectedPid;
+        *pidversion = isolationHelperPidversion;
+        *generation = isolationGeneration;
+    }
+    pthread_mutex_unlock(&isolationStateLock);
+    return port;
+}
+
 int posix_spawnattr_setspecialport_np(posix_spawnattr_t *attr, mach_port_t new_port, int which);
 int posix_spawnattr_set_registered_ports_np(posix_spawnattr_t * __restrict attr, mach_port_t portarray[], uint32_t count);
 
 int registerServerPort()
 {
 	assert(getpid() == 1);
+    pthread_mutex_lock(&isolationStateLock);
+    isolation_clear_locked();
+    isolationExpectedPid = 0;
+    pthread_mutex_unlock(&isolationStateLock);
 
 	// deallocate the previous port if it exists
 	if(MACH_PORT_VALID(gJailbreakdPort)) {
@@ -80,6 +185,10 @@ mach_port_t jailbreakdClientPortFastGet()
 
 void setJailbreakdProcess(pid_t pid)
 {
+    pthread_mutex_lock(&isolationStateLock);
+    if (isolationExpectedPid != pid) isolation_clear_locked();
+    isolationExpectedPid = pid;
+    pthread_mutex_unlock(&isolationStateLock);
 	//Reclaim the previous jailbreakd zombie process
 	const char *pidenv = getenv("JAILBREAKD_PID");
 	if (pidenv) 
@@ -391,40 +500,44 @@ int jbdSpinlockFixOnly(int pid, bool resume)
 	return result;
 }
 
-// The strict isolation route must not be selected before the helper can answer.
+// Publication alone is not readiness: the event loop must answer a bounded v2 PING.
 bool jbdIsolationHelperReady(void)
 {
-    return MACH_PORT_VALID(gJailbreakdPort);
+    pid_t helper = 0;
+    int version = 0;
+    uint64_t generation = 0;
+    mach_port_t port = isolation_copy_service(false, &helper, &version, &generation);
+    if (!MACH_PORT_VALID(port)) return false;
+    int result = rh_isolation_mach_call(port, helper, version, RH_ISOLATION_PING, 0, 0,
+                                        RH_ISOLATION_PING_MS);
+    mach_port_deallocate(mach_task_self(), port);
+    if (result) {
+        isolation_invalidate_generation(generation, result != ETIMEDOUT && result != EINTR);
+        return false;
+    }
+    pthread_mutex_lock(&isolationStateLock);
+    bool current = isolationGeneration == generation;
+    if (current) isolationVerified = true;
+    pthread_mutex_unlock(&isolationStateLock);
+    return current;
 }
 
 int jbdAppIsolationRepair(pid_t pid)
-{    if (getpid() != 1 || pid <= 1) return EPERM;
-    xpc_object_t message = xpc_dictionary_create_empty();
-    if (!message) return ENOMEM;
-    xpc_dictionary_set_uint64(message, "id", JBD_MSG_APP_ISOLATION_REPAIR);
-    xpc_dictionary_set_int64(message, "pid", pid);
-    xpc_dictionary_set_uint64(message, "isolation-protocol", RH_APP_ISOLATION_PROTOCOL);
-    // Do not enter reactiveJailbreakdPort(): its legacy failure path may abort
-    // launchd. This opt-in request must reject a dead current port instead.
-    mach_port_t isolationPort = gJailbreakdPort;
-    if (!MACH_PORT_VALID(isolationPort) ||
-        mach_port_mod_refs(mach_task_self(), isolationPort, MACH_PORT_RIGHT_SEND, 1) != KERN_SUCCESS) {
-        xpc_release(message);
-        return ENOTCONN;
-    }
-    xpc_object_t pipe = xpc_pipe_create_from_port(isolationPort, 0);
-    if (!pipe) {
-        mach_port_deallocate(mach_task_self(), isolationPort);
-        xpc_release(message);
-        return ENOTCONN;
-    }
-    xpc_object_t reply = NULL;
-    int transport = xpc_pipe_routine(pipe, message, &reply);
-    xpc_release(pipe);
-    mach_port_deallocate(mach_task_self(), isolationPort);
-    xpc_release(message);
-    int result = transport == 0 ? rh_app_isolation_reply_status(reply) : EIO;
-    if (reply) xpc_release(reply);
+{
+    if (getpid() != 1 || pid <= 1) return EPERM;
+    int targetVersion = proc_get_pidversion(pid);
+    if (targetVersion <= 0) return ESRCH;
+    pid_t helper = 0;
+    int helperVersion = 0;
+    uint64_t generation = 0;
+    mach_port_t port = isolation_copy_service(true, &helper, &helperVersion, &generation);
+    if (!MACH_PORT_VALID(port)) return ENOTCONN;
+    int result = rh_isolation_mach_call(port, helper, helperVersion, RH_ISOLATION_REPAIR,
+                                        pid, targetVersion, RH_ISOLATION_REPAIR_MS);
+    mach_port_deallocate(mach_task_self(), port);
+    if (result == ETIMEDOUT || result == ENOTCONN || result == EPROTO || result == EIO)
+        isolation_invalidate_generation(generation, result != ETIMEDOUT);
+    /* Never resume here: the strict spawn owner kills this child on any failure. */
     return result;
 }
 

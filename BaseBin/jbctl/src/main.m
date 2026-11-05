@@ -3,6 +3,7 @@
 #import <libjailbreak/jbclient_mach.h>
 #import <libjailbreak/stock_fixes.h>
 #import "internal.h"
+#import "update_target.h"
 
 #import <Foundation/Foundation.h>
 #import <CoreServices/LSApplicationProxy.h>
@@ -182,6 +183,11 @@ int main(int argc, char* argv[])
 		}
 
 		if (!strcmp(updateType, "tipa")) {
+            JBCTLUpdatePackage *package = jbctl_update_preflight_tipa([NSString stringWithUTF8String:updateFile]);
+            if (!package) {
+                printf("TIPA preflight failed: require one bounded com.doimty.dopamine bundle with version and basebin archive.\n");
+                return 6;
+            }
 			setsid();
 
 			LSApplicationProxy *trollstoreAppProxy = [LSApplicationProxy applicationProxyForIdentifier:@"com.opa334.TrollStore"];
@@ -196,12 +202,15 @@ int main(int argc, char* argv[])
 				return 5;
 			}
 
-			LSApplicationProxy *dopamineAppProxy = [LSApplicationProxy applicationProxyForIdentifier:@"cn.zqbb.dopaRH"];
-			if (!dopamineAppProxy) {
-				printf("Unable to locate newly installed Dopamine build.\n");
+			LSApplicationProxy *dopamineAppProxy = [LSApplicationProxy applicationProxyForIdentifier:JBCTLDopamineBundleIdentifier];
+			NSString *basebinPath = dopamineAppProxy.installed ?
+				jbctl_update_bound_basebin_path(dopamineAppProxy.bundleURL.path, package) : nil;
+			if (!basebinPath) {
+				printf("Installed %s does not match the input TIPA version/archive; update was not staged.\n", JBCTLDopamineBundleIdentifier.UTF8String);
 				return 6;
 			}
-			updateFile = strdup([dopamineAppProxy.bundleURL.path stringByAppendingPathComponent:@"basebin.tar"].fileSystemRepresentation);
+			updateFile = strdup(basebinPath.fileSystemRepresentation);
+			if (!updateFile) return ENOMEM;
 			// Fall through to basebin installation
 		}
 		else if (!strcmp(updateType, "tarball")) {

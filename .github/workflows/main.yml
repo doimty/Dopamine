@@ -3,12 +3,12 @@ name: "*** build ipa/tipa file ***"
 on:
   push:
     branches:
-      - '*'
+      - '**'
     paths-ignore:
       - ".gitignore"
   pull_request:
     branches:
-      - '*'
+      - '**'
     paths-ignore:
       - ".gitignore"
   workflow_dispatch:
@@ -20,6 +20,7 @@ concurrency:
 jobs:
   build:
     runs-on: macos-latest
+    timeout-minutes: 45
     steps:
       - name: Xcode Setup
         uses: maxim-lobanov/setup-xcode@v1
@@ -31,10 +32,18 @@ jobs:
         with:
             submodules: recursive
 
-      - name: App isolation host regressions
+      - name: Merge and isolation integration regressions
+        timeout-minutes: 10
         run: |
           set -euo pipefail
-          bash scripts/test-app-isolation.sh 2>&1 | tee app-isolation-tests.log
+          {
+            bash scripts/test-app-isolation.sh
+            python3 scripts/test-update-contracts.py
+            python3 tests/test-release-verifier.py
+            python3 scripts/test-app-isolation-integration.py --sanitizer address
+            python3 worker/test_configuration_cache.py --sanitizer address
+            bash scripts/test-app-isolation-mach.sh
+          } 2>&1 | tee app-isolation-tests.log
 
       - name: Install Procursus
         uses: dhinakg/procursus-action@main
@@ -74,8 +83,8 @@ jobs:
       - name: Set Environment Variables
         run: |
           set -x
-          T2=$(TZ=UTC-2 date +'%Y%m%d_%H%M%S')
-          TS=$(date -j -f "%Y%m%d_%H%M%S" "${T2}" +%s)
+          T2=$(TZ=UTC date +'%Y%m%d_%H%M%S')
+          TS=$(date -u +%s)
           SHASH=$(git rev-parse --short HEAD)
           echo "ctime=${T2}" >> $GITHUB_ENV
           echo "ctimestamp=${TS}" >> $GITHUB_ENV
@@ -92,11 +101,20 @@ jobs:
           export THEOS="${BASEDIR}/theos"
           plutil -insert items.4 -xml "<dict><key>cell</key><string>PSGroupCell</string><key>label</key><string>BUILDER</string></dict>" ./Application/Dopamine/UI/Settings/Credits.plist
           plutil -insert items.5 -xml "<dict><key>cell</key><string>PSGroupCell</string><key>headerCellClass</key><string>DOCreditsCell</string><key>names</key><array><dict><key>name</key><string>${{ github.actor }}</string><key>link</key><string>https://github.com/${{ github.repository }}</string></dict></array></dict>" ./Application/Dopamine/UI/Settings/Credits.plist
-          gmake -j$(sysctl -n hw.logicalcpu) NIGHTLY=1
+          gmake -j$(sysctl -n hw.logicalcpu) NIGHTLY=1 BUILD_TIMESTAMP="${{ env.ctimestamp }}"
           VERSION="("$(cat ./BaseBin/_external/basebin/.version)-$(cat ./BaseBin/_external/basebin/.version-roothide)-$(git rev-parse --short HEAD)")"-$(TZ=UTC git show -s --date=format-local:'%Y.%m.%d-%Z-%H.%M.%S' --format='%cd' HEAD)
           mv ./Application/Dopamine.ipa  "./Application/doimty-Dopamine-${VERSION}.ipa"
           mv ./Application/Dopamine.tipa "./Application/doimty-Dopamine-${VERSION}.tipa"
           echo "version=${VERSION}" >> $GITHUB_ENV
+
+      - name: Verify packaged identity and archives
+        run: |
+          set -euo pipefail
+          python3 scripts/verify-release-package.py \
+            --ipa "./Application/doimty-Dopamine-${{ env.version }}.ipa" \
+            --tipa "./Application/doimty-Dopamine-${{ env.version }}.tipa" \
+            --commit "${{ github.sha }}" \
+            --output release-manifest.json
 
       - name: Upload app isolation regression log
         if: always()
@@ -106,19 +124,25 @@ jobs:
           path: app-isolation-tests.log
           if-no-files-found: warn
 
-      - name: Upload Artifact
-        id: dopamine-latest-upload
-        uses: actions/upload-artifact@main
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
         with:
-          name: Dopamine
-          path: |
-            ${{ github.workspace }}/Application/doimty-Dopamine-${{ env.version }}.ipa
-          archive: false
+          name: Dopamine-IPA
+          path: Application/doimty-Dopamine-${{ env.version }}.ipa
+          if-no-files-found: error
+          compression-level: 0
 
-      - name: Upload Artifact(TIPA)
-        id: dopamine-latest-upload-tipa
-        uses: actions/upload-artifact@main
+      - name: Upload TIPA
+        uses: actions/upload-artifact@v4
         with:
-          path: |
-            ${{ github.workspace }}/Application/doimty-Dopamine-${{ env.version }}.tipa
-          archive: false
+          name: Dopamine-TIPA
+          path: Application/doimty-Dopamine-${{ env.version }}.tipa
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Upload release manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-manifest
+          path: release-manifest.json
+          if-no-files-found: error

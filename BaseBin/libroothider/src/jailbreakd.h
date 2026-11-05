@@ -2,6 +2,8 @@
 #define JAILBREAKD_H
 
 #include <unistd.h>
+#include <mach/mach.h>
+#include <xpc/xpc.h>
 
 typedef enum {
 	JBD_MSG_TEST_CALL = 101,
@@ -39,5 +41,8 @@ int jbdExecTraceCancel(const char* execfile, bool* detached);
 int jbdSpinlockFixOnly(int pid, bool resume);
 int jbdAppIsolationRepair(pid_t pid);
 bool jbdIsolationHelperReady(void);
+/* Optional v2 capability carried by the existing helper check-in. */
+mach_port_t jbdCheckinWithIsolation(mach_port_t isolation_port);
+int jbdRegisterIsolationHelper(audit_token_t *token, xpc_object_t capability);
 
 #endif // JAILBREAKD_H

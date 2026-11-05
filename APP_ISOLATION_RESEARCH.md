@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-This is an automatic research candidate on `feature/app-isolation-spinlock`, based on Dopamine `c2b9cfe`. Every effectively blacklisted app on a supported device uses it, with a per-app opt-out. It does not change the connected phone, replace an installed engine, or request a reboot.
+This repair branch (`fix/merge-isolation-20261105`, based on the merged `a8f0b01`) keeps the old automatic isolation feature while fixing its integration contracts. Only an effectively blacklisted, verified main executable on a supported device is eligible, with a global switch and per-app opt-out. Source changes and host tests do not change the connected phone, replace an installed engine, or request a reboot.
 
 The aim is to combine genuine non-injection of the normal RootHide chain with existing server-side full-blacklist treatment, while retaining the existing iOS15 arm64e loadDyldCache repair. This is not a promise of zero spinlock panics, an undetectable jailbreak, or a complete stock process. It does not falsify dyld image lists or other detection results.
 
@@ -12,7 +12,8 @@ All of these must be true:
 
 - The process is already effectively fully blacklisted by the existing RootHide/fork whitelist policy.
 - It is the verified main executable of an ordinary removable application bundle.
-- Platform is iOS15 arm64e and the existing global dyld fix is enabled.
+- Platform is iOS15 arm64e, the existing global dyld fix and isolation switches are enabled, initial activation is finished, and a bounded v2 PING verifies the helper's receive loop.
+- Effective blacklist and opt-out are read from one retained RootHide configuration snapshot. A malformed/temporarily unreadable file preserves both last-good values together. Eligibility independently verifies the canonical top-level bundle's regular executable, rather than assuming every path below its container is an application main program.
 - The per-bundle `appconfigSpinlockSafe` entry is entirely optional now. The route
   is automatic for every effectively blacklisted app on a supported device; an
   explicit plist Boolean `false` opts one app out, anything else keeps it on.
@@ -41,8 +42,8 @@ process; existing running processes cannot be reverted by a config edit.
 - Existing launchd-hosted jailbreak service denials and selected launchd/LaunchServices/preference-query filtering continue to use that same blacklisted PID. The child is not granted a check-in exemption.
 - Raw original spawn does not add normal systemhook/tweak injection. A checked deep environment copy removes safe-mode markers and only known RootHide-owned DYLD_INSERT_LIBRARIES entries. Unrelated libraries, relative paths, malformed paths and App-embedded load commands are not secretly rewritten, so zero foreign images is not guaranteed.
 - The child is forced START_SUSPENDED before creation. Attribute errors abort before spawn. Original attribute flags are restored afterward; that userspace operation does not resume the already-created child.
-- A new IPC request1007 is accepted only from launchd for its own paused child on the supported platform with dyld fix enabled. Unlike the legacy request, an originally suspended child does not silently substitute csflags-only handling.
-- Reply protocol1 requires an explicitly typed result and repair-applied acknowledgment. Old/mismatched helpers returning empty replies fail closed.
+- Strict repair uses a dedicated fixed-layout Mach v2 request from launchd for its own paused child, binding PID version, nonce, operation and an absolute deadline. It has bounded send/receive waits and one fresh reply receive right per request. An originally suspended child does not silently substitute csflags-only handling.
+- The dedicated service port is offered through the existing helper check-in, then verified with a real bounded PING; allocating a port alone never establishes readiness. Old or mismatched helpers leave this route unavailable. The original XPC request1007/protocol1 remains a legacy interface, not the transport used by the repaired strict route.
 - The acknowledgment means the prelaunch repair-hook INSTALLATION succeeded. The server never resumes the child. Launchd resumes only after validating the acknowledgment and only if the caller originally requested a running child.
 - Any restoration/repair/resume failure after creation requests termination of only that child, keeps its published PID, and never retries native spawn unpatched. Returning native success after creation allows launchd to observe the real child's exit; it is not a claim that the application initialized successfully.
 - Complete function/trampoline spans and mapped addresses are checked before the strict route writes child memory. The patched trampoline and entry must survive header-page removal.
@@ -61,12 +62,15 @@ The original blacklisted TrollStoreLite/signing route, Choicy route, ordinary in
 6. Patch/trampoline range and integer-overflow boundaries.
 7. Real host XPC dictionaries for valid, old, missing, malformed and wrong-type repair acknowledgments.
 
-The CI also builds the actual launchdhook, libroothider and jailbreakd integration for arm64/arm64e as part of the complete application. Passing host tests does not prove actual kernel mappings or permissions on the phone.
+The CI additionally runs production Foundation/path/config/whitelist integration tests (`scripts/test-app-isolation-integration.py`), real host Mach transport tests (`scripts/test-app-isolation-mach.sh`), update identity/version tests (`scripts/test-update-contracts.py`) and the existing configuration-cache regressions. These tests exercise the production input construction instead of treating hand-filled policy booleans as a complete integration proof.
+
+The CI also builds the actual launchdhook, libroothider and jailbreakd integration for arm64/arm64e and verifies the byte-identical IPA/TIPA, package ID, executable modes, paired basebin versions and hashes. Passing host tests does not prove actual kernel mappings or permissions on the phone. App installation and runtime basebin activation must be verified separately.
 
 ## Remaining limitations and device acceptance
 
-- `proc_fix_spinlock` installs a hook before the child executes. The original shared-cache runtime remapping happens AFTER resume. Existing code does not report every signature/mmap/subcache failure and this candidate does not pretend that protocol1 verifies those later results.
-- Existing assertions, kernel-offset discovery, synchronous helper IPC and low-level VM operations remain potential failure points. Helper unavailability/invalid replies are rejected; there is no newly proven bounded timeout/cancellation protocol for a stuck helper.
+- The strict function installs a hook before the child executes. The original shared-cache runtime remapping happens AFTER resume. Existing code does not report every signature/mmap/subcache failure; a v2 acknowledgment is not verification of those later results.
+- The new transport bounds the client's Mach send/receive wait, and the checked repair cooperatively tests cancellation and target identity before remote writes. It does not preempt an in-flight kernel primitive. `proc_find` does not acquire a real proc reference, so checks and writes retain a narrow race window; retaining a Mach task right is not a claim of atomic BSD process pinning.
+- Existing assertions, kernel-offset discovery and legacy helper IPC remain separate failure points. They are not silently converted to the new transport or covered by its deadlines.
 - Partial low-level patch failure is not a rollback guarantee. That is why the child is terminated and never released/retried after any uncertain repair.
 - Private cache mappings, the small dyld function patch, helper code mappings and pmap permissions are real and can be observable. Keeping necessary repair and being indistinguishable from stock are not the same objective.
 - Only a separately authorized controlled test should establish effective blacklist membership, ordinary-app eligibility, actual strict repair acknowledgment, existing native dyld identity, RX/private executable-cache mappings, absence of the normal owned injected modules, unchanged jailbreak API denials, and normal foreground/background behavior. Installation, blacklist edits and restart are not performed automatically.

@@ -608,20 +608,22 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
     int jailFoolsStatus = trust_jailfools_bundle_before_spawn(path);
     if (jailFoolsStatus != 0) return jailFoolsStatus;
 
-	bool roothideBlacklisted = isBlacklistedPath(path);
+    struct roothide_app_spawn_policy appPolicy = roothide_get_app_spawn_policy(path);
+	bool roothideBlacklisted = appPolicy.blacklisted;
     // Automatic: every effectively blacklisted app on a supported device gets the
     // repair unless the global switch is off or the app is explicitly opted out.
-    // The route needs the helper, so stay on the legacy path until the jailbreak
-    // is finalized and the helper port exists; otherwise spawn would be killed.
+    // Only probe the helper for an eligible, enabled main application. The
+    // bounded readiness handshake must succeed before a child is spawned.
     bool requestedIsolation = roothideBlacklisted && iOS15Arm64e && dyld_patch_enabled() &&
-        !launchdhookFirstLoad && jbdIsolationHelperReady() &&
-        spinlock_safe_isolation_enabled() && !appSpinlockIsolationOptedOut(path);
+        !launchdhookFirstLoad && spinlock_safe_isolation_enabled() &&
+        appPolicy.verified_main_executable && !appPolicy.isolation_opted_out &&
+        jbdIsolationHelperReady();
     struct app_isolation_context isolationContext = {
         .ios15_arm64e = iOS15Arm64e,
         .global_dyld_fix = dyld_patch_enabled(),
         .effective_blacklisted = roothideBlacklisted,
         .choicy_blocked = choicyBlocked,
-        .ordinary_removable_app = requestedIsolation && isRemovableBundlePath(path),
+        .ordinary_removable_app = appPolicy.verified_main_executable,
         .not_trollstore = requestedIsolation,
         .spinlock_safe_opt_in = requestedIsolation,
         .is_extension = app_isolation_path_is_extension(path),

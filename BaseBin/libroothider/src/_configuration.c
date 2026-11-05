@@ -251,11 +251,9 @@ bool zqbb_dictionary_matches_path(const char *path, const char *config)
 }
 
 // 兼容旧版 NSDictionary 中布尔、数字和字符串的 boolValue。
-bool zqbb_dictionary_bool_value(const char *name, const char *section, const char *path)
+bool zqbb_dictionary_snapshot_bool_value(xpc_object_t plist, const char *name, const char *section)
 {
-    if (!name) return false;
-    xpc_object_t plist = zqbb_read_dictionary(path);
-    if (!plist) return false;
+    if (!name || !plist || xpc_get_type(plist) != XPC_TYPE_DICTIONARY) return false;
     xpc_object_t dictionary = section ? xpc_dictionary_get_value(plist, section) : plist;
     xpc_object_t value = dictionary && xpc_get_type(dictionary) == XPC_TYPE_DICTIONARY ?
                          xpc_dictionary_get_value(dictionary, name) : NULL;
@@ -270,6 +268,14 @@ bool zqbb_dictionary_bool_value(const char *name, const char *section, const cha
             enabled = zqbb_configuration_string_bool(xpc_string_get_string_ptr(value));
         }
     }
-    xpc_release(plist);
+    return enabled;
+}
+
+bool zqbb_dictionary_bool_value(const char *name, const char *section, const char *path)
+{
+    if (!name) return false;
+    xpc_object_t plist = zqbb_read_dictionary(path);
+    bool enabled = zqbb_dictionary_snapshot_bool_value(plist, name, section);
+    if (plist) xpc_release(plist);
     return enabled;
 }
