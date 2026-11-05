@@ -28,6 +28,7 @@ int wait_for_exit(pid_t pid);
 bool proc_cantrace(pid_t pid);
 int proc_patch_dyld(pid_t pid);
 int proc_fix_spinlock(pid_t pid);
+int proc_fix_spinlock_strict(pid_t pid);
 int proc_patch_csflags(pid_t pid);
 pid_t proc_get_ppid(pid_t pid);
 int proc_get_pidversion(pid_t pid);
@@ -38,6 +39,8 @@ char* proc_get_identifier(pid_t pid, char buffer[255]);
 
 bool isBlacklistedApp(const char* identifier);
 bool isBlacklistedPath(const char* path);
+bool appSpinlockIsolationRequested(const char *path);
+bool appSpinlockIsolationOptedOut(const char *path);
 
 bool isBlacklistedToken(audit_token_t* token);
 bool isBlacklistedPid(pid_t pid);
