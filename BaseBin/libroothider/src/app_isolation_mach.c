@@ -116,7 +116,7 @@ int rh_isolation_mach_call(mach_port_t service, pid_t helper_pid, int helper_pid
     mach_msg_destroy(&reply->header);
 done:
     /* Discard queued/late replies, revoke the service's send-once right, never reuse this mailbox. */
-    mach_port_destroy(mach_task_self(), reply_port);
+    mach_port_mod_refs(mach_task_self(), reply_port, MACH_PORT_RIGHT_RECEIVE, -1);
     return result;
 }
 

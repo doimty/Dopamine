@@ -49,17 +49,23 @@ mach_port_t jailbreakd_start_isolation_server(void)
     if (mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &port) != KERN_SUCCESS)
         return MACH_PORT_NULL;
     if (mach_port_insert_right(mach_task_self(), port, port, MACH_MSG_TYPE_MAKE_SEND) != KERN_SUCCESS) {
-        mach_port_destroy(mach_task_self(), port);
+        mach_port_mod_refs(mach_task_self(), port, MACH_PORT_RIGHT_RECEIVE, -1);
         return MACH_PORT_NULL;
     }
     static dispatch_source_t source;
     source = dispatch_source_create(DISPATCH_SOURCE_TYPE_MACH_RECV, port, 0, dispatch_get_main_queue());
-    if (!source) { mach_port_destroy(mach_task_self(), port); return MACH_PORT_NULL; }
+    if (!source) {
+        mach_port_mod_refs(mach_task_self(), port, MACH_PORT_RIGHT_RECEIVE, -1);
+        mach_port_deallocate(mach_task_self(), port);
+        return MACH_PORT_NULL;
+    }
     dispatch_source_set_event_handler(source, ^{
         rh_isolation_mach_serve_once(port, 1, isolation_supported(), repair_child, NULL);
     });
     dispatch_source_set_cancel_handler(source, ^{
-        mach_port_destroy(mach_task_self(), port);
+        // Remove our receive right first, then our remaining send/dead-name uref.
+        mach_port_mod_refs(mach_task_self(), port, MACH_PORT_RIGHT_RECEIVE, -1);
+        mach_port_deallocate(mach_task_self(), port);
     });
     dispatch_resume(source);
     return port;

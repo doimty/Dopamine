@@ -29,7 +29,8 @@ assert "jbdRegisterIsolationHelper(callerToken, isolationCapability)" in domain
 assert "dispatch_async" not in server and "jbserver_xpc_send_dict" not in server
 assert "RH_ISOLATION_REPAIR_MS" in repair
 assert "MACH_SEND_TIMEOUT" in mach and "MACH_RCV_TIMEOUT" in mach
-assert "mach_port_destroy(mach_task_self(), reply_port)" in mach
+assert "mach_port_mod_refs(mach_task_self(), reply_port, MACH_PORT_RIGHT_RECEIVE, -1)" in mach
+assert "mach_port_destroy(" not in mach and "mach_port_destroy(" not in server
 assert "reply->nonce != request.nonce" in mach
 assert "audit_token_to_pidversion(trailer->msgh_audit) != helper_pidversion" in mach
 assert "rh_isolation_request_cancelled" in server

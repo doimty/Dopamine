@@ -122,7 +122,9 @@ static void stop_fixture(struct fixture *fixture)
     dispatch_source_set_cancel_handler(fixture->source, ^{ dispatch_semaphore_signal(done); });
     dispatch_source_cancel(fixture->source);
     assert(dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, 5 * NSEC_PER_SEC)) == 0);
-    mach_port_destroy(mach_task_self(), fixture->port);
+    // The fixture owns one receive right and one send uref under this name.
+    assert(mach_port_mod_refs(mach_task_self(), fixture->port, MACH_PORT_RIGHT_RECEIVE, -1) == KERN_SUCCESS);
+    assert(mach_port_deallocate(mach_task_self(), fixture->port) == KERN_SUCCESS);
     dispatch_release(done);
     dispatch_release(fixture->source);
     dispatch_release(fixture->queue);
