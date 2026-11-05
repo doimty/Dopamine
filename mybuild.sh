@@ -81,7 +81,7 @@ if [[ ! "$version" =~ ^[0-9A-Za-z][0-9A-Za-z._+-]*$ ]]; then
     exit 1
 fi
 destination_dir="${HOME:?HOME 未设置}/www/html/TS"
-destination_path="$destination_dir/Dopamine_roothide_zqbb_${version}_${build_started_at}.ipa"
+destination_path="$destination_dir/Dopamine_roothide_doimty_${version}_${build_started_at}.ipa"
 mkdir -p "$destination_dir"
 
 # 在目标目录内原子替换，避免下载到复制了一半的文件。
@@ -91,7 +91,7 @@ cp "$ipa_path" "$temporary_ipa"
 chmod 644 "$temporary_ipa"
 mv -f -- "$temporary_ipa" "$destination_path"
 # 使用同目录相对链接，并在 IPA 完整复制后原子更新 latest。
-latest_path="$destination_dir/Dopamine_roothide_zqbb_latest.ipa"
+latest_path="$destination_dir/Dopamine_roothide_doimty_latest.ipa"
 ln -s "$(basename "$destination_path")" "$temporary_ipa"
 mv -fh -- "$temporary_ipa" "$latest_path"
 trap - EXIT

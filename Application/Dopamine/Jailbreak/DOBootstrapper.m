@@ -1011,6 +1011,11 @@ Suites: stable\n\
 Components: main\n\
 \n\
 Types: deb\n\
+URIs: https://doimty.github.io/\n\
+Suites: ./\n\
+Components:\n\
+\n\
+Types: deb\n\
 URIs: https://roothide.github.io/\n\
 Suites: ./\n\
 Components:\n\
@@ -1032,6 +1037,7 @@ deb https://getzbra.com/repo/ ./\n\
 deb https://repo.chariz.com/ ./\n\
 deb https://yourepo.com/ ./\n\
 deb https://havoc.app/ ./\n\
+deb https://doimty.github.io/ ./\n\
 deb https://roothide.github.io/ ./\n\
 deb https://roothide.github.io/procursus iphoneos-arm64e/%d main\n\
 deb https://github.com/roothide/roothide.github.io/releases/download/%d/ ./\n\

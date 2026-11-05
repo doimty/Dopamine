@@ -7,6 +7,12 @@ bool trollstore_lite_fix_enabled(void)
 	return !__atomic_load_n(&gSystemInfo.jailbreakSettings.trollStoreLiteFixDisabled, __ATOMIC_RELAXED);
 }
 
+// 黑名单 App 的 spinlock 隔离同样默认开启，只有显式关闭才回到旧路径。
+bool spinlock_safe_isolation_enabled(void)
+{
+	return !__atomic_load_n(&gSystemInfo.jailbreakSettings.spinlockSafeIsolationDisabled, __ATOMIC_RELAXED);
+}
+
 int jbsettings_get(const char *key, xpc_object_t *valueOut)
 {
 	if (!key)	return -1;
@@ -17,6 +23,10 @@ int jbsettings_get(const char *key, xpc_object_t *valueOut)
 	}
 	else if (!strcmp(key, "trollStoreLiteFixEnabled")) {
 		*valueOut = xpc_bool_create(trollstore_lite_fix_enabled());
+		return 0;
+	}
+	else if (!strcmp(key, "spinlockSafeIsolationEnabled")) {
+		*valueOut = xpc_bool_create(spinlock_safe_isolation_enabled());
 		return 0;
 	}
 	else if (!strcmp(key, "jetsamMultiplier")) {
@@ -34,6 +44,10 @@ int jbsettings_set(const char *key, xpc_object_t value)
 	}
 	else if (!strcmp(key, "trollStoreLiteFixEnabled") && xpc_get_type(value) == XPC_TYPE_BOOL) {
 		__atomic_store_n(&gSystemInfo.jailbreakSettings.trollStoreLiteFixDisabled, !xpc_bool_get_value(value), __ATOMIC_RELAXED);
+		return 0;
+	}
+	else if (!strcmp(key, "spinlockSafeIsolationEnabled") && xpc_get_type(value) == XPC_TYPE_BOOL) {
+		__atomic_store_n(&gSystemInfo.jailbreakSettings.spinlockSafeIsolationDisabled, !xpc_bool_get_value(value), __ATOMIC_RELAXED);
 		return 0;
 	}
 	else if (!strcmp(key, "jetsamMultiplier") && xpc_get_type(value) == XPC_TYPE_DOUBLE) {

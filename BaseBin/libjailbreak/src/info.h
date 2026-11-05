@@ -55,6 +55,8 @@ struct system_info {
 		bool markAppsAsDebugged;
 		// 使用原有对齐空隙；旧环境缺少此字段时为 false，修复默认开启。
 		bool trollStoreLiteFixDisabled;
+		// 同样落在对齐空隙内，旧环境读作 false，即黑名单隔离默认开启。
+		bool spinlockSafeIsolationDisabled;
 		double jetsamMultiplier;
 	} jailbreakSettings;
 
@@ -443,6 +445,7 @@ extern struct system_info gSystemInfo;
 #define JAILBREAK_SETTINGS_ITERATE(ctx, iterator) \
 	iterator(ctx, jailbreakSettings.markAppsAsDebugged); \
 	iterator(ctx, jailbreakSettings.trollStoreLiteFixDisabled); \
+	iterator(ctx, jailbreakSettings.spinlockSafeIsolationDisabled); \
 	iterator(ctx, jailbreakSettings.jetsamMultiplier);
 
 #define KERNEL_SYMBOLS_ITERATE(ctx, iterator) \

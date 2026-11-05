@@ -154,3 +154,18 @@
 "Uptime_Format" = "%llu天 %02llu:%02llu:%02llu";
 "Build version: %@" = "編譯版本：%@";
 "Build time: %@" = "編譯時間：%@";
+
+// App isolation & roothide compatibility
+"Checking_For_Duplicate_Apps" = "正在檢查重複 App";
+"Hiding_Jailbreak" = "隱藏越獄環境";
+"Enable_Dyld_Patch" = "啟用 dyld 修補";
+"Dyld_Patch_Spinlock_Fix" = "dyld 修補（Spinlock 修復）";
+"Spinlock_Fix_Warning" = "啟用 Spinlock 修復後，黑名單 App 的擴展將被停用；當黑名單 App 在前台或背景執行時，也可能觸發 Spinlock panic。\n\n你可以先在 Choicy 中關閉該 App 的外掛注入（Spinlock 修復仍然有效），如果問題仍未解決，再將該 App 加入黑名單。";
+"Settings_Spinlock_Isolation" = "黑名單應用 Spinlock 隔離";
+"Error" = "錯誤";
+"OK" = "好";
+"Warning" = "警告";
+"Settings_Title" = "設定";
+"Setting_Apply_Failed_Message" = "無法套用此設定。請更新越獄環境後重試。";
+"Rebuilding Icon Cache" = "重建圖示快取";
+"Your device currently has another jailbreak activated, please reboot device." = "偵測到裝置目前已啟用其他越獄，請重新啟動裝置。";

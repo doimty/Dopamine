@@ -17,6 +17,8 @@
 #include "trollstore_lite_bundle.h"
 #include "trollstore_lite_txm.h"
 #include "jbserver/jbsettings.h"
+#include "app_isolation_policy.h"
+#include "app_isolation_spawn.h"
 #include <xpc_private.h>
 #include <bsm/libbsm.h>
 
@@ -341,6 +343,93 @@ int __blacklisted_posix_spawn_orig_wrapper(pid_t *restrict pidp, const char *res
 	return ret;
 }
 
+struct app_isolation_native_context {
+    const char *path;
+    struct _posix_spawn_args_desc *desc;
+    char *const *argv;
+    char *const *envp;
+};
+
+static int isolation_get_flags(void *opaque, short *flags) {
+    struct app_isolation_native_context *context = opaque;
+    return posix_spawnattr_getflags(&context->desc->attrp, flags);
+}
+static int isolation_set_flags(void *opaque, short flags) {
+    struct app_isolation_native_context *context = opaque;
+    return posix_spawnattr_setflags(&context->desc->attrp, flags);
+}
+static int isolation_spawn_original(void *opaque, pid_t *published) {
+    struct app_isolation_native_context *context = opaque;
+    return __posix_spawn_orig_wrapper(published, context->path, context->desc,
+        context->argv, context->envp);
+}
+// The legacy blacklist wrapper grants this to TrollStoreLite apps from trusted
+// launchd. Replacing that wrapper must not silently drop the grant, so mirror it
+// here before the repair. Failure is logged but not fatal, as in the legacy path.
+static void isolation_grant_lite_trust(const char *path, pid_t child) {
+    if (!path || !hasTrollstoreLiteMarker(path)) return;
+    mach_port_t task = MACH_PORT_NULL;
+    if (task_name_for_pid(mach_task_self(), child, &task) != KERN_SUCCESS) {
+        JBLogError("isolation: no audit token for %d", child);
+        return;
+    }
+    audit_token_t token = {0};
+    mach_msg_type_number_t count = TASK_AUDIT_TOKEN_COUNT;
+    kern_return_t kr = task_info(task, TASK_AUDIT_TOKEN, (task_info_t)&token, &count);
+    mach_port_deallocate(mach_task_self(), task);
+    if (kr != KERN_SUCCESS) {
+        JBLogError("isolation: task_info failed for %d: %d", child, kr);
+        return;
+    }
+    char *rootPath = NULL;
+    char *bootUUID = NULL;
+    bool fullyDebugged = false;
+    bool forceCSAdhoc = false;
+    if (systemwide_process_checkin(&token, &rootPath, &bootUUID, NULL,
+            &fullyDebugged, &forceCSAdhoc) != 0) {
+        JBLogError("isolation: lite trust grant failed for %d", child);
+    }
+    free(rootPath);
+    free(bootUUID);
+}
+
+static int isolation_install_repair(void *opaque, pid_t child) {
+    struct app_isolation_native_context *context = opaque;
+    isolation_grant_lite_trust(context ? context->path : NULL, child);
+    return jbdAppIsolationRepair(child);
+}
+static int isolation_resume(void *opaque, pid_t child) {
+    (void)opaque;
+    return kill(child, SIGCONT) == 0 ? 0 : errno;
+}
+static int isolation_terminate(void *opaque, pid_t child) {
+    (void)opaque;
+    if (child <= 1) return EINVAL;
+    // This child is still ours. A failed repair may have changed its dyld code.
+    kill(child, SIGQUIT);
+    if (kill(child, SIGKILL) == 0 || errno == ESRCH) return 0;
+    return errno;
+}
+static int isolation_spawn_strict(pid_t *published, const char *path,
+    struct _posix_spawn_args_desc *desc, char *const argv[], char *const envp[])
+{
+    struct app_isolation_native_context context = {path, desc, argv, envp};
+    const struct app_isolation_spawn_ops operations = {
+        isolation_get_flags, isolation_set_flags, isolation_spawn_original,
+        isolation_install_repair, isolation_resume, isolation_terminate
+    };
+    struct app_isolation_spawn_report report = app_isolation_spawn(&operations,
+        &context, published, POSIX_SPAWN_START_SUSPENDED);
+    int savedError = errno;
+    if (report.error) {
+        JBLogError("app isolation start phase=%d error=%d created=%d repair=%d kill-request=%d kill-error=%d path=%s",
+            report.phase, report.error, report.created, report.repair_applied,
+            report.child_killed, report.kill_error, path);
+    }
+    errno = savedError;
+    return report.result;
+}
+
 int roothide_launchd___posix_spawn__spinlock_fix_only(pid_t *restrict pidp, const char *restrict path, struct _posix_spawn_args_desc *desc, char *const argv[restrict], char *const envp[restrict])
 {
 	//spawn_prehook ensure this is always available
@@ -520,6 +609,29 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
     if (jailFoolsStatus != 0) return jailFoolsStatus;
 
 	bool roothideBlacklisted = isBlacklistedPath(path);
+    // Automatic: every effectively blacklisted app on a supported device gets the
+    // repair unless the global switch is off or the app is explicitly opted out.
+    // The route needs the helper, so stay on the legacy path until the jailbreak
+    // is finalized and the helper port exists; otherwise spawn would be killed.
+    bool requestedIsolation = roothideBlacklisted && iOS15Arm64e && dyld_patch_enabled() &&
+        !launchdhookFirstLoad && jbdIsolationHelperReady() &&
+        spinlock_safe_isolation_enabled() && !appSpinlockIsolationOptedOut(path);
+    struct app_isolation_context isolationContext = {
+        .ios15_arm64e = iOS15Arm64e,
+        .global_dyld_fix = dyld_patch_enabled(),
+        .effective_blacklisted = roothideBlacklisted,
+        .choicy_blocked = choicyBlocked,
+        .ordinary_removable_app = requestedIsolation && isRemovableBundlePath(path),
+        .not_trollstore = requestedIsolation,
+        .spinlock_safe_opt_in = requestedIsolation,
+        .is_extension = app_isolation_path_is_extension(path),
+        .active_prewarm = envbuf_getenv(envp, "ActivePrewarm") != NULL,
+        .dyld_use_closures = envbuf_getenv(envp, "DYLD_USE_CLOSURES") != NULL,
+        .launchd_first_load = launchdhookFirstLoad,
+    };
+    enum app_isolation_route isolationRoute = app_isolation_policy_decide(&isolationContext);
+    bool strictIsolation = roothideBlacklisted && requestedIsolation &&
+        isolationRoute == APP_ISOLATION_ROUTE_BLACKLIST_SPINLOCK;
 	if (choicyBlocked || roothideBlacklisted)
 	{
 		// 开关仅控制新增 TXM 修复，原有启动前自动信任始终执行。
@@ -532,25 +644,25 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
 
 		JBLogDebug("blacklisted app %s", path);
 
-		if(dyld_patch_enabled() && iOS15Arm64e && roothideBlacklisted && (strstr(path, "/PlugIns/") || strstr(path, "/Extensions/") || strstr(path, ".appex/"))) {
-			JBLogDebug("prevent blacklisted app's extension from running: ", path);
-			ret = EPERM;
-		}
-		else if(dyld_patch_enabled() && iOS15Arm64e && roothideBlacklisted && (envbuf_getenv(envp, "ActivePrewarm") || envbuf_getenv(envp, "DYLD_USE_CLOSURES"))) {
-			JBLogDebug("prevent blacklisted app from prewarming: ", path);
-			ret = EPERM;
-		}
+		if (isolationRoute == APP_ISOLATION_ROUTE_REJECT) {
+            JBLogDebug("prevent blacklisted extension/prewarm/closures launch: %s", path);
+            ret = EPERM;
+        }
 		else
 		{
             if (trollstoreLiteFixEnabled && roothideBlacklisted && hasTrollstoreLiteMarker(path) && txm_local_signing_supported()) {
                 return spawn_blacklisted_trollstore_lite(pidp, path, desc, argv, envp);
             }
 
-			char **envc = envbuf_mutcopy((const char **)envp);
+			char **envc = strictIsolation ? RHIsolationCopyEnvironment((const char *const *)envp,
+                JBROOT_PATH("/"), HOOK_DYLIB_PATH) : envbuf_mutcopy((const char **)envp);
+            if (strictIsolation && !envc) { errno = ENOMEM; return -1; }
 
-			//choicy may set these 
-			envbuf_unsetenv(&envc, "_SafeMode");
-			envbuf_unsetenv(&envc, "_MSSafeMode");
+            if (!strictIsolation) {
+                // Preserve the legacy path's environment handling exactly.
+                envbuf_unsetenv(&envc, "_SafeMode");
+                envbuf_unsetenv(&envc, "_MSSafeMode");
+            }
 	
 			/* According to xnu, the new thread in new process will not run in userland until after copyout pid
 			https://github.com/apple-oss-distributions/xnu/blob/8d741a5de7ff4191bf97d57b9f54c2f6d4a15585/bsd/kern/kern_exec.c#L4321
@@ -561,28 +673,37 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
 			/* and posix_spawn->kernel->amfid->launchd may cause xpc dead loop so we can't use lock-spawn-unlock here */
 	
 			volatile pid_t* blacklistedPidp = allocBlacklistProcessId();
-	
-			if(roothideBlacklisted || !dyld_patch_enabled() || !iOS15Arm64e) {
-				ret = __blacklisted_posix_spawn_orig_wrapper(blacklistedPidp, path, desc, argv, envc);
-			} else {
-				ret = roothide_launchd___posix_spawn__spinlock_fix_only(blacklistedPidp, path, desc, argv, envc);
-			}
-	
+            if (!blacklistedPidp) {
+                if (strictIsolation) RHIsolationFreeEnvironment(envc); else envbuf_free(envc);
+                errno = ENOMEM;
+                return -1;
+            }
+
+            if (strictIsolation) {
+                ret = isolation_spawn_strict((pid_t *)blacklistedPidp, path, desc, argv, envc);
+            } else if (isolationRoute == APP_ISOLATION_ROUTE_BLACKLIST_NATIVE) {
+                ret = __blacklisted_posix_spawn_orig_wrapper(blacklistedPidp, path, desc, argv, envc);
+            } else {
+                ret = roothide_launchd___posix_spawn__spinlock_fix_only(blacklistedPidp, path, desc, argv, envc);
+            }
+            int spawnError = errno;
+
 			pid_t pid = *blacklistedPidp;
 			if(pidp) *pidp = *blacklistedPidp;
 
 			commitBlacklistProcessId(blacklistedPidp); // will release blacklistedPidp
 			blacklistedPidp = NULL;
 
-			envbuf_free(envc);
-				
-			if(ret==0 && pid>0) {
+            if (strictIsolation) RHIsolationFreeEnvironment(envc); else envbuf_free(envc);
+
+			if(!strictIsolation && ret==0 && pid>0) {
 				short flags = 0;
 				posix_spawnattr_getflags(attrp, &flags);
 				if((flags & POSIX_SPAWN_START_SUSPENDED) != 0) {
 					platform_set_process_debugged(pid, false);
 				}
 			}
+            if (strictIsolation) errno = spawnError;
 		}
 	
 		return ret;

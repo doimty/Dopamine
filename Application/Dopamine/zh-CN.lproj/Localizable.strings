@@ -149,3 +149,38 @@
 "Uptime_Format" = "%llu天 %02llu:%02llu:%02llu";
 "Build version: %@" = "编译版本：%@";
 "Build time: %@" = "编译时间：%@";
+
+// 补充的界面与兼容性文案
+"Settings_Allow_Old_arm64e_ABI_Libraries" = "允许旧版 arm64e ABI 库";
+"Hint_Hide_Jailbreak_Jailbroken" = "“隐藏越狱”可暂时停用越狱，以绕过部分越狱检测。此功能并不完全有效，也无法隐藏所有痕迹，但可让设备接近重启后、再次越狱前的状态。它不能替代 RootHide；此功能可能引发问题，使用时需自行承担风险。";
+"Section_Boot_Logo" = "启动 Logo";
+"Enabled" = "已启用";
+"Custom_Boot_Logo" = "自定义启动 Logo";
+"Select_Image" = "选择图片";
+"Password_Auth_Required" = "修改 mobile 密码需要验证身份。";
+"Respring_Required" = "需要重新启动 SpringBoard";
+"Respring_Required_Message" = "所选内核漏洞需要创建连续内存映射，而此设备只能通过执行重新启动 SpringBoard 的特殊方案实现。完成后请重新打开 Dopamine，再次点击“越狱”。";
+"Respring_Required_Notice_A8" = "在你的设备上，此方案不一定每次都能成功，可能需要重复应用，直到不再出现此提示。";
+"Apply_Workaround" = "应用方案";
+"Respring_Cancel" = "取消";
+"Rebuilding Icon Cache" = "重建图标缓存";
+"Settings_Title" = "设置";
+"Settings_TrollStoreLite_Fix" = "TrollStoreLite 修复";
+"Error" = "错误";
+"OK" = "好";
+"Warning" = "警告";
+"Other_Jailbreak_Active_Message" = "检测到设备当前已激活其他越狱，请重启设备。";
+"Checking For Duplicate Apps" = "正在检查重复 App";
+"Hiding Jailbreak" = "隐藏越狱环境";
+"Done" = "完成";
+"Jailbreak_Failed_With_Error" = "越狱失败：%@";
+"Setting_Apply_Failed_Message" = "无法应用此设置。请更新越狱环境后重试。";
+"Your device currently has another jailbreak activated, please reboot device." = "检测到设备当前已激活其他越狱，请重启设备。";
+
+// App isolation & roothide compatibility
+"Checking_For_Duplicate_Apps" = "正在检查重复 App";
+"Hiding_Jailbreak" = "隐藏越狱环境";
+"Enable_Dyld_Patch" = "启用 dyld 补丁";
+"Dyld_Patch_Spinlock_Fix" = "dyld 补丁（Spinlock 修复）";
+"Spinlock_Fix_Warning" = "启用 Spinlock 修复后，黑名单 App 的扩展将被停用；当黑名单 App 在前台或后台运行时，也可能触发 Spinlock panic。\n\n你可以先在 Choicy 中关闭该 App 的插件注入（Spinlock 修复仍然有效），如果问题仍未解决，再将该 App 加入黑名单。";
+"Settings_Spinlock_Isolation" = "黑名单应用 Spinlock 隔离";

@@ -108,6 +108,7 @@ NSString *getAppBundlePathFromSpawnPath(const char *path);
     @"com.opa334.Dopamine.roothide",\
     @"com.opa334.Dopamine-roothide",\
     @"cn.zqbb.dopaRH",\
+    @"com.doimty.dopamine",\
 ]
 
 @class NSSet;

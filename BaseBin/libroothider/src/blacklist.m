@@ -57,7 +57,7 @@ NSSet* builtinApps()
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         JBLogDebug("Initializing builtin apps set");
-        apps = [NSSet setWithObjects:@"com.opa334.Dopamine-roothide", @"cn.zqbb.dopaRH", nil];
+        apps = [NSSet setWithObjects:@"com.opa334.Dopamine-roothide", @"cn.zqbb.dopaRH", @"com.doimty.dopamine", nil];
         NSString* customBundleId = [NSString stringWithContentsOfFile:JBROOT_PATH(@"/basebin/.AppIdentifier") encoding:NSUTF8StringEncoding error:nil];
         if(customBundleId && customBundleId.length > 0) {
             JBLogDebug("Added custom bundle identifier to builtin apps: %s", customBundleId.UTF8String);
@@ -85,6 +85,52 @@ static bool isBlacklistedPath_orig(const char* path)
     NSString* identifier = getAppIdentifierFromPath(path);
     if(!identifier) return false;
     return isBlacklistedApp(identifier.UTF8String);
+}
+
+// Resolve a verified main executable in a user app bundle to its identifier.
+static NSString *isolationAppIdentifier(const char *path)
+{
+    NSString *bundlePath = getAppBundlePathFromSpawnPath(path);
+    if (!bundlePath) return nil;
+    NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:[bundlePath stringByAppendingPathComponent:@"Info.plist"]];
+    if (![info isKindOfClass:NSDictionary.class]) return nil;
+    NSString *identifier = info[@"CFBundleIdentifier"];
+    NSString *executable = info[@"CFBundleExecutable"];
+    if (![identifier isKindOfClass:NSString.class] || !identifier.length ||
+        ![executable isKindOfClass:NSString.class] || !executable.length ||
+        [executable containsString:@"/"]) return nil;
+    NSString *expected = [[bundlePath stringByAppendingPathComponent:executable] stringByResolvingSymlinksInPath];
+    NSString *actual = [[NSString stringWithUTF8String:path] stringByResolvingSymlinksInPath];
+    if (![actual isEqualToString:expected]) return nil;
+    return identifier;
+}
+
+static id isolationOverrideValue(const char *path)
+{
+    NSString *identifier = isolationAppIdentifier(path);
+    if (!identifier) return nil;
+    NSDictionary *preferences = [NSDictionary dictionaryWithContentsOfFile:
+        JBROOT_PATH(@"/var/mobile/Library/RootHide/RootHideConfig.plist")];
+    if (![preferences isKindOfClass:NSDictionary.class]) return nil;
+    NSDictionary *apps = preferences[@"appconfigSpinlockSafe"];
+    if (![apps isKindOfClass:NSDictionary.class]) return nil;
+    id value = apps[identifier];
+    if (!value || CFGetTypeID((__bridge CFTypeRef)value) != CFBooleanGetTypeID()) return nil;
+    return value;
+}
+
+// Explicit opt-in is optional now; the route is on by default for blacklisted apps.
+bool appSpinlockIsolationRequested(const char *path)
+{
+    id value = isolationOverrideValue(path);
+    return value && CFBooleanGetValue((__bridge CFBooleanRef)value);
+}
+
+// Only an explicit Boolean false disables the automatic route for one app.
+bool appSpinlockIsolationOptedOut(const char *path)
+{
+    id value = isolationOverrideValue(path);
+    return value && !CFBooleanGetValue((__bridge CFBooleanRef)value);
 }
 
 static const char *injectPlistPath = NULL;

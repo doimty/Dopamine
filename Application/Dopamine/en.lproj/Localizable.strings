@@ -154,3 +154,25 @@
 "Uptime_Format" = "%llu d %02llu:%02llu:%02llu";
 "Build version: %@" = "Build version: %@";
 "Build time: %@" = "Build time: %@";
+
+// Additional UI strings
+"Settings_Title" = "Settings";
+"Settings_TrollStoreLite_Fix" = "TrollStoreLite Fix";
+"Error" = "Error";
+"OK" = "OK";
+"Warning" = "Warning";
+"Other_Jailbreak_Active_Message" = "Your device currently has another jailbreak activated. Please reboot the device.";
+"Checking For Duplicate Apps" = "Checking For Duplicate Apps";
+"Hiding Jailbreak" = "Hiding Jailbreak";
+"Done" = "Done";
+"Jailbreak_Failed_With_Error" = "Jailbreak failed with error: %@";
+"Setting_Apply_Failed_Message" = "Could not apply this setting. Update the jailbreak environment and try again.";
+"Your device currently has another jailbreak activated, please reboot device." = "Your device currently has another jailbreak activated. Please reboot the device.";
+
+// App isolation & roothide compatibility
+"Checking_For_Duplicate_Apps" = "Checking For Duplicate Apps";
+"Hiding_Jailbreak" = "Hiding Jailbreak";
+"Enable_Dyld_Patch" = "Enable dyld patch";
+"Dyld_Patch_Spinlock_Fix" = "Dyld Patch (Spinlock Fix)";
+"Spinlock_Fix_Warning" = "When spinlock fix is enabled, app extensions of blacklisted apps will be disabled and may also cause spinlock panics when the blacklisted app is in the foreground or background.\n\nYou can first try disabling tweak injection for the app in Choicy (spinlock fix still works), and only blacklist the app if that does not work.";
+"Settings_Spinlock_Isolation" = "Blacklist Spinlock Isolation";
