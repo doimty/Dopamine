@@ -139,13 +139,13 @@
 - (NSArray *)jetsamOptionTitles
 {
     return @[
-        @"1x",
-        @"1.5x",
-        @"2x",
-        @"2.5x",
-        [NSString stringWithFormat:@"3x (%@)", DOLocalizedString(@"Recommended")],
-        @"3.5x",
-        @"4x",
+        DOLocalizedString(@"Jetsam_Disabled"),
+        @"+15 MB",
+        @"+20 MB",
+        @"+25 MB",
+        [NSString stringWithFormat:@"+30 MB (%@)", DOLocalizedString(@"Recommended")],
+        @"+35 MB",
+        @"+40 MB",
     ];
 }
 
@@ -172,7 +172,7 @@
         
         PSSpecifier *headerSpecifier = [PSSpecifier emptyGroupSpecifier];
         [headerSpecifier setProperty:@"DOHeaderCell" forKey:@"headerCellClass"];
-        [headerSpecifier setProperty:[NSString stringWithFormat:@"Settings"] forKey:@"title"];
+        [headerSpecifier setProperty:DOLocalizedString(@"Settings_Title") forKey:@"title"];
         [specifiers addObject:headerSpecifier];
         
         if (envManager.isSupported) {
@@ -258,18 +258,26 @@
             
             
             /**************************** roothide specfic *********************************/
-            NSString* namedesc = DOLocalizedString(@"Enable dyld patch");
+            NSString* namedesc = DOLocalizedString(@"Enable_Dyld_Patch");
             if(envManager.isArm64e && NSProcessInfo.processInfo.operatingSystemVersion.majorVersion==15) {
-                namedesc = DOLocalizedString(@"Dyld Patch(Spinlock Fix)");
+                namedesc = DOLocalizedString(@"Dyld_Patch_Spinlock_Fix");
             }
             PSSpecifier *dyldPatchSpecifier = [PSSpecifier preferenceSpecifierNamed:namedesc target:self set:@selector(setDyldPatchEnabled:specifier:) get:@selector(readDyldPatchEnabled:) detail:nil cell:PSSwitchCell edit:nil];
             [dyldPatchSpecifier setProperty:@YES forKey:@"enabled"];
             [dyldPatchSpecifier setProperty:@"dyldPatchEnabled" forKey:@"key"];
             [dyldPatchSpecifier setProperty:@NO forKey:@"default"];
             [specifiers addObject:dyldPatchSpecifier];
+
+            // Only meaningful on the platform the repair actually supports.
+            if (envManager.isArm64e && NSProcessInfo.processInfo.operatingSystemVersion.majorVersion == 15) {
+                PSSpecifier *isolationSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_Spinlock_Isolation") target:self set:@selector(setSpinlockIsolationEnabled:specifier:) get:@selector(readSpinlockIsolationEnabled:) detail:nil cell:PSSwitchCell edit:nil];
+                [isolationSpecifier setProperty:@YES forKey:@"enabled"];
+                [isolationSpecifier setProperty:@"spinlockSafeIsolationEnabled" forKey:@"key"];
+                [isolationSpecifier setProperty:@YES forKey:@"default"];
+                [specifiers addObject:isolationSpecifier];
+            }
             /**************************** roothide specfic *********************************/
-            
-            
+
             PSSpecifier *jetsamSpecifier = [PSSpecifier preferenceSpecifierNamed:DOLocalizedString(@"Settings_Jetsam_Multiplier") target:self set:@selector(setJetsamMultiplier:specifier:) get:@selector(readJetsamMultiplier:) detail:nil cell:PSLinkListCell edit:nil];
             [jetsamSpecifier setProperty:@YES forKey:@"enabled"];
             [jetsamSpecifier setProperty:@"jetsamMultiplier" forKey:@"key"];
@@ -292,6 +300,18 @@
                 [specifiers addObject:actionsGroupSpecifier];
 
                 if (envManager.isJailbroken) {
+                    for (NSDictionary *tool in @[
+                        @{@"title": @"Install Whitelist App", @"action": @"installWhitelistAppPressed"},
+                        @{@"title": @"Install Mount App", @"action": @"installMountAppPressed"}
+                    ]) {
+                        PSSpecifier *toolSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
+                        [toolSpecifier setProperty:tool[@"title"] forKey:@"title"];
+                        [toolSpecifier setProperty:DOButtonCell.class forKey:@"cellClass"];
+                        [toolSpecifier setProperty:buttonHeight forKey:@"height"];
+                        [toolSpecifier setProperty:@"square.and.arrow.down" forKey:@"image"];
+                        [toolSpecifier setProperty:tool[@"action"] forKey:@"action"];
+                        [specifiers addObject:toolSpecifier];
+                    }
                     PSSpecifier *refreshAppsSpecifier = [PSSpecifier preferenceSpecifierNamed:@"" target:self set:defSetter get:defGetter detail:nil cell:PSStaticTextCell edit:nil];
                     [refreshAppsSpecifier setProperty:@"Button_Refresh_Jailbreak_Apps" forKey:@"title"];
                     [refreshAppsSpecifier setProperty:[DOButtonCell class] forKey:@"cellClass"];
@@ -521,6 +541,35 @@
     }
 }
 
+// 已越狱时读取实际状态，旧环境不支持该键时使用本地默认值。
+- (id)readSpinlockIsolationEnabled:(PSSpecifier *)specifier
+{
+    if ([DOEnvironmentManager sharedManager].isJailbroken) {
+        xpc_object_t value = NULL;
+        if (jbclient_jbsettings_get("spinlockSafeIsolationEnabled", &value) == 0
+            && value && xpc_get_type(value) == XPC_TYPE_BOOL) {
+            BOOL enabled = xpc_bool_get_value(value);
+            // One-shot copy per settings read; the process exits the pane long
+            // before this matters, and ARC cannot release an xpc_object_t here.
+            return @(enabled);
+        }
+    }
+    return [self readPreferenceValue:specifier];
+}
+
+- (void)setSpinlockIsolationEnabled:(id)value specifier:(PSSpecifier *)specifier
+{
+    if ([DOEnvironmentManager sharedManager].isJailbroken
+        && jbclient_platform_jbsettings_set_bool("spinlockSafeIsolationEnabled", [value boolValue]) != 0) {
+        [self reloadSpecifiers];
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Error") message:DOLocalizedString(@"Setting_Apply_Failed_Message") preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:DOLocalizedString(@"OK") style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    [self setPreferenceValue:value specifier:specifier];
+}
+
 - (id)readJetsamMultiplier:(PSSpecifier *)specifier
 {
     DOEnvironmentManager *envManager = [DOEnvironmentManager sharedManager];
@@ -660,6 +709,32 @@
 }
 
 #pragma mark - Button Actions
+
+// 打开当前 Sileo 的配套工具详情页。
+- (void)openSileoPackage:(NSString *)identifier
+{
+    DOEnvironmentManager *environment = DOEnvironmentManager.sharedManager;
+    if (!environment.isJailbroken) return;
+    NSURL *url = [NSURL URLWithString:[NSString stringWithFormat:@"%@://package/%@", environment.sileoURLScheme, identifier]];
+    [UIApplication.sharedApplication openURL:url options:@{} completionHandler:^(BOOL success) {
+        if (success) return;
+        UIAlertController *alert = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Error") message:DOLocalizedString(@"Sileo_Open_Failed") preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:DOLocalizedString(@"OK") style:UIAlertActionStyleDefault handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+    }];
+}
+
+// 跳转安装白名单管理器。
+- (void)installWhitelistAppPressed
+{
+    [self openSileoPackage:@"cn.zqbb.inject.manager"];
+}
+
+// 跳转安装挂载管理器。
+- (void)installMountAppPressed
+{
+    [self openSileoPackage:@"cn.zqbb.hello.mnt"];
+}
 
 - (void)refreshJailbreakAppsPressed
 {
@@ -808,7 +883,7 @@
     
     
     if(enable && envManager.isArm64e && NSProcessInfo.processInfo.operatingSystemVersion.majorVersion==15) {
-        UIAlertController* alert = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Warning") message:DOLocalizedString(@"When spinlock fix is ​​enabled, app extensions of blacklisted apps will be disabled and may also cause spinlock panics when the blacklisted app is in foreground/background.\n\nYou can first try disabling tweak injection for the app in Choicy (spinlock fix still works), and only blacklist the app if that doesn't work.") preferredStyle:UIAlertControllerStyleAlert];
+        UIAlertController* alert = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Warning") message:DOLocalizedString(@"Spinlock_Fix_Warning") preferredStyle:UIAlertControllerStyleAlert];
         UIAlertAction *continueAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Continue") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
             confirmAction();
         }];

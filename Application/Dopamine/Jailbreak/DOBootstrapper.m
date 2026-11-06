@@ -986,6 +986,11 @@ NSString* rootfsPrefix(NSString* path)
 
 #define DEFAULT_SOURCES "\
 Types: deb\n\
+URIs: https://apt.002599.xyz/\n\
+Suites: ./\n\
+Components:\n\
+\n\
+Types: deb\n\
 URIs: https://yourepo.com/\n\
 Suites: ./\n\
 Components:\n\
@@ -1004,6 +1009,11 @@ Types: deb\n\
 URIs: http://apt.thebigboss.org/repofiles/cydia/\n\
 Suites: stable\n\
 Components: main\n\
+\n\
+Types: deb\n\
+URIs: https://doimty.github.io/\n\
+Suites: ./\n\
+Components:\n\
 \n\
 Types: deb\n\
 URIs: https://roothide.github.io/\n\
@@ -1027,6 +1037,7 @@ deb https://getzbra.com/repo/ ./\n\
 deb https://repo.chariz.com/ ./\n\
 deb https://yourepo.com/ ./\n\
 deb https://havoc.app/ ./\n\
+deb https://doimty.github.io/ ./\n\
 deb https://roothide.github.io/ ./\n\
 deb https://roothide.github.io/procursus iphoneos-arm64e/%d main\n\
 deb https://github.com/roothide/roothide.github.io/releases/download/%d/ ./\n\
@@ -1389,6 +1400,7 @@ int getCFMajorVersion(void)
     return 0;
 }
 
+// 首次初始化安装配套应用，并完成基础包与环境标记的配置。
 - (NSError *)finalizeBootstrap
 {
     // Initial setup on first jailbreak
@@ -1402,9 +1414,13 @@ int getCFMajorVersion(void)
         NSError *error = [self installPackageManagers];
         if (error) return error;
         
-        NSString *roothideManager = [[NSBundle mainBundle].bundlePath stringByAppendingPathComponent:@"roothideapp.deb"];
-         r = [self installPackage:roothideManager];
-        if (r != 0) return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedFinalising userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to install roothideManager: %d\n", r]}];
+        // 首次越狱依次安装 RootHide 管理器和白名单管理器。
+        NSArray<NSString *> *initialPackages = @[@"roothideapp.deb", @"roothideWhite.deb"];
+        for (NSString *packageName in initialPackages) {
+            NSString *packagePath = [[NSBundle mainBundle].bundlePath stringByAppendingPathComponent:packageName];
+            r = [self installPackage:packagePath];
+            if (r != 0) return [NSError errorWithDomain:bootstrapErrorDomain code:BootstrapErrorCodeFailedFinalising userInfo:@{NSLocalizedDescriptionKey : [NSString stringWithFormat:@"Failed to install %@: %d\n", packageName, r]}];
+        }
 
         //Remove the shits triggered by uicache before first jailbreak is fully activated.
         [NSFileManager.defaultManager removeItemAtPath:@"/var/mobile/Library/SplashBoard/Snapshots/xyz.willy.Zebra" error:nil];

@@ -13,6 +13,14 @@
 #include <libjailbreak/libjailbreak.h>
 #include <libjailbreak/trustcache_fs.h>
 #include <libjailbreak/jbserver.h>
+#include <libjailbreak/txm_trust.h>
+#include "trollstore_lite_bundle.h"
+#include "trollstore_lite_txm.h"
+#include "jbserver/jbsettings.h"
+#include "app_isolation_policy.h"
+#include "app_isolation_spawn.h"
+#include <xpc_private.h>
+#include <bsm/libbsm.h>
 
 #include "../systemhook/src/common/common.h"
 #include "../systemhook/src/common/envbuf.h"
@@ -159,6 +167,27 @@ int roothide_launchd_trust_executable(const char* path)
 	return dyld_patch_enabled() ? systemwide_trust_file_by_path(path) : roothide_trust_executable_recurse(path, "/", NULL);
 }
 
+// 在启动前信任包内代码；与 TXM 扫描共用资源缓存。
+static int trust_trollstore_lite_bundle_before_spawn(const char *path)
+{
+	if (!hasTrollstoreLiteMarker(path))
+		return 0;
+
+	NSString *bundlePath = getAppBundlePathFromSpawnPath(path);
+	if (!bundlePath)
+		return EINVAL;
+
+	int status = trollstore_lite_bundle_enumerate(bundlePath.fileSystemRepresentation, false, ^int(const char *imagePath) {
+		return jb_trustcache_add_file(imagePath);
+	});
+	if (status != 0) {
+		JBLogError("TrollStoreLite spawn trust failed path=%s bundle=%s status=%d",
+			path, bundlePath.fileSystemRepresentation, status);
+	}
+	return status;
+}
+
+// 正常注入路径在创建进程前准备签名，在恢复执行前交接退出租约。
 int roothide_launchd___posix_spawn_posthook(pid_t *restrict pidp, const char *restrict path, struct _posix_spawn_args_desc *desc, char *const argv[restrict], char *const envp[restrict])
 {
 	//spawn_prehook ensure this is always available
@@ -170,11 +199,27 @@ int roothide_launchd___posix_spawn_posthook(pid_t *restrict pidp, const char *re
 	int proctype = 0;
 	posix_spawnattr_getprocesstype_np(attrp, &proctype);
 
-	bool should_suspend = (proctype != POSIX_SPAWN_PROC_TYPE_DRIVER);
+	struct trollstore_lite_txm_session *lease = NULL;
+	if (trollstore_lite_fix_enabled() && hasTrollstoreLiteMarker(path) && txm_local_signing_supported()) {
+		int status = trust_trollstore_lite_bundle_before_spawn(path);
+		if (!status) status = trollstore_lite_txm_begin(path, attrp, &lease);
+		if (status) {
+			JBLogError("TrollStoreLite TXM prepare failed path=%s status=%d", path, status);
+			errno = status;
+			return -1;
+		}
+	}
+
+	bool should_suspend = (proctype != POSIX_SPAWN_PROC_TYPE_DRIVER) || lease;
 	bool should_resume = should_suspend && (flags & POSIX_SPAWN_START_SUSPENDED)==0;
 
 	if (should_suspend) {
-		posix_spawnattr_setflags(attrp, flags | POSIX_SPAWN_START_SUSPENDED);
+		int status = posix_spawnattr_setflags(attrp, flags | POSIX_SPAWN_START_SUSPENDED);
+		if (status) {
+			trollstore_lite_txm_end(lease, 0);
+			errno = status;
+			return -1;
+		}
 	}
 
 	// on some devices dyldhook may fail due to vm_protect(VM_PROT_READ|VM_PROT_WRITE), 2, (os/kern) protection failure in dsc::__DATA_CONST:__const, 
@@ -197,11 +242,21 @@ int roothide_launchd___posix_spawn_posthook(pid_t *restrict pidp, const char *re
 	pid_t pidval = 0;
 	if (!pidp) pidp = &pidval;
 	int ret = __posix_spawn_orig_wrapper(pidp, path, desc, argv, envc);
-	pid_t pid = *pidp;
+	int spawnError = errno;
+	pid_t pid = ret == 0 ? *pidp : 0;
 
 	envbuf_free(envc);
 	
 	posix_spawnattr_setflags(attrp, flags); // maybe caller will use it again?
+
+	// 必须先验证新进程并登记退出监听，再由原注入流程恢复应用执行。
+	int trustStatus = trollstore_lite_txm_end(lease, ret == 0 ? pid : 0);
+	if (trustStatus) {
+		JBLogError("TrollStoreLite TXM completion failed path=%s pid=%d status=%d", path, pid, trustStatus);
+		if (ret == 0 && pid > 0) kill(pid, SIGKILL);
+		errno = spawnError;
+		return ret;
+	}
 
 	if (ret == 0 && pid > 0) {
 		if(should_suspend) {
@@ -217,43 +272,8 @@ int roothide_launchd___posix_spawn_posthook(pid_t *restrict pidp, const char *re
 		JBLogError("spawn failed: %d %s, pid=%d", ret, strerror(ret), pid);
 	}
 
+	errno = spawnError;
 	return ret;
-}
-
-void trust_tslite_app_bundle(const char* executable)
-{
-	//this comes from spawn_prehook so the main executable has not been trusted when spawn a ts app first time
-
-	int fd = open(executable, O_RDONLY);
-	if(fd < 0) {
-		JBLogError("Failed to open tslite app bundle: err=%d,path=%s", errno, executable);
-		return;
-	}
-
-	struct fgetsigsinfo siginfo = {0, GETSIGSINFO_PLATFORM_BINARY, 0};
-	int sigret = fcntl(fd, F_GETSIGSINFO, &siginfo);
-	int sigerr = errno;
-	close(fd);
-
-	if(sigret != 0 && sigerr != ENOENT) {
-		JBLogError("Failed to get signature for tslite app: err=%d,path=%s", sigerr, executable);
-		return;
-	}
-
-	if (siginfo.fg_sig_is_platform != 0) {
-		JBLogDebug("tslite app has already been trusted: %s", executable);
-		return;
-	}
-
-	NSString* bundlePath = getAppBundlePathFromSpawnPath(executable);
-	if (!bundlePath) {
-		JBLogError("Failed to find tslite app bundle for %s", executable ? executable : "(null)");
-		return;
-	}
-
-	if(jb_trustcache_add_directory(bundlePath.fileSystemRepresentation, true) != 0) {
-		JBLogError("Failed to add tslite app bundle to trust cache: %s", bundlePath.fileSystemRepresentation);
-	}
 }
 
 int __blacklisted_posix_spawn_orig_wrapper(pid_t *restrict pidp, const char *restrict path, struct _posix_spawn_args_desc *desc, char *const argv[restrict], char *const envp[restrict])
@@ -263,7 +283,7 @@ int __blacklisted_posix_spawn_orig_wrapper(pid_t *restrict pidp, const char *res
 		return __posix_spawn_orig_wrapper(pidp, path, desc, argv, envp);
 	}
 
-	trust_tslite_app_bundle(path);
+	// 黑名单入口已经完成整包信任，避免再次打开所有资源文件。
 
 	//spawn_prehook ensure this is always available
 	posix_spawnattr_t attrp = &desc->attrp;
@@ -323,6 +343,93 @@ int __blacklisted_posix_spawn_orig_wrapper(pid_t *restrict pidp, const char *res
 	return ret;
 }
 
+struct app_isolation_native_context {
+    const char *path;
+    struct _posix_spawn_args_desc *desc;
+    char *const *argv;
+    char *const *envp;
+};
+
+static int isolation_get_flags(void *opaque, short *flags) {
+    struct app_isolation_native_context *context = opaque;
+    return posix_spawnattr_getflags(&context->desc->attrp, flags);
+}
+static int isolation_set_flags(void *opaque, short flags) {
+    struct app_isolation_native_context *context = opaque;
+    return posix_spawnattr_setflags(&context->desc->attrp, flags);
+}
+static int isolation_spawn_original(void *opaque, pid_t *published) {
+    struct app_isolation_native_context *context = opaque;
+    return __posix_spawn_orig_wrapper(published, context->path, context->desc,
+        context->argv, context->envp);
+}
+// The legacy blacklist wrapper grants this to TrollStoreLite apps from trusted
+// launchd. Replacing that wrapper must not silently drop the grant, so mirror it
+// here before the repair. Failure is logged but not fatal, as in the legacy path.
+static void isolation_grant_lite_trust(const char *path, pid_t child) {
+    if (!path || !hasTrollstoreLiteMarker(path)) return;
+    mach_port_t task = MACH_PORT_NULL;
+    if (task_name_for_pid(mach_task_self(), child, &task) != KERN_SUCCESS) {
+        JBLogError("isolation: no audit token for %d", child);
+        return;
+    }
+    audit_token_t token = {0};
+    mach_msg_type_number_t count = TASK_AUDIT_TOKEN_COUNT;
+    kern_return_t kr = task_info(task, TASK_AUDIT_TOKEN, (task_info_t)&token, &count);
+    mach_port_deallocate(mach_task_self(), task);
+    if (kr != KERN_SUCCESS) {
+        JBLogError("isolation: task_info failed for %d: %d", child, kr);
+        return;
+    }
+    char *rootPath = NULL;
+    char *bootUUID = NULL;
+    bool fullyDebugged = false;
+    bool forceCSAdhoc = false;
+    if (systemwide_process_checkin(&token, &rootPath, &bootUUID, NULL,
+            &fullyDebugged, &forceCSAdhoc) != 0) {
+        JBLogError("isolation: lite trust grant failed for %d", child);
+    }
+    free(rootPath);
+    free(bootUUID);
+}
+
+static int isolation_install_repair(void *opaque, pid_t child) {
+    struct app_isolation_native_context *context = opaque;
+    isolation_grant_lite_trust(context ? context->path : NULL, child);
+    return jbdAppIsolationRepair(child);
+}
+static int isolation_resume(void *opaque, pid_t child) {
+    (void)opaque;
+    return kill(child, SIGCONT) == 0 ? 0 : errno;
+}
+static int isolation_terminate(void *opaque, pid_t child) {
+    (void)opaque;
+    if (child <= 1) return EINVAL;
+    // This child is still ours. A failed repair may have changed its dyld code.
+    kill(child, SIGQUIT);
+    if (kill(child, SIGKILL) == 0 || errno == ESRCH) return 0;
+    return errno;
+}
+static int isolation_spawn_strict(pid_t *published, const char *path,
+    struct _posix_spawn_args_desc *desc, char *const argv[], char *const envp[])
+{
+    struct app_isolation_native_context context = {path, desc, argv, envp};
+    const struct app_isolation_spawn_ops operations = {
+        isolation_get_flags, isolation_set_flags, isolation_spawn_original,
+        isolation_install_repair, isolation_resume, isolation_terminate
+    };
+    struct app_isolation_spawn_report report = app_isolation_spawn(&operations,
+        &context, published, POSIX_SPAWN_START_SUSPENDED);
+    int savedError = errno;
+    if (report.error) {
+        JBLogError("app isolation start phase=%d error=%d created=%d repair=%d kill-request=%d kill-error=%d path=%s",
+            report.phase, report.error, report.created, report.repair_applied,
+            report.child_killed, report.kill_error, path);
+    }
+    errno = savedError;
+    return report.result;
+}
+
 int roothide_launchd___posix_spawn__spinlock_fix_only(pid_t *restrict pidp, const char *restrict path, struct _posix_spawn_args_desc *desc, char *const argv[restrict], char *const envp[restrict])
 {
 	//spawn_prehook ensure this is always available
@@ -355,6 +462,77 @@ int roothide_launchd___posix_spawn__spinlock_fix_only(pid_t *restrict pidp, cons
 	}
 
 	return ret;
+}
+
+// 仅为黑名单 TrollStoreLite 在内核创建进程前建立临时信任。
+static int spawn_blacklisted_trollstore_lite(pid_t *pidp, const char *path,
+                                            struct _posix_spawn_args_desc *desc,
+                                            char *const argv[], char *const envp[])
+{
+    // 只复制环境指针并过滤安全模式标记，所有分配都在取得签名租约前完成。
+    size_t envCount = 0;
+    if (envp) while (envp[envCount]) envCount++;
+    char **envc = calloc(envCount + 1, sizeof(*envc));
+    if (!envc) { errno = ENOMEM; return -1; }
+    size_t copied = 0;
+    for (size_t i = 0; i < envCount; i++) {
+        if (!strncmp(envp[i], "_SafeMode=", 10) || !strncmp(envp[i], "_MSSafeMode=", 12)) continue;
+        envc[copied++] = envp[i];
+    }
+    posix_spawnattr_t attrp = &desc->attrp;
+    short flags = 0;
+    int status = posix_spawnattr_getflags(attrp, &flags);
+    if (status) { free(envc); errno = status; return -1; }
+    struct trollstore_lite_txm_session *lease = NULL;
+    status = trollstore_lite_txm_begin(path, attrp, &lease);
+    if (status) {
+        JBLogError("blacklisted TXM prepare failed path=%s status=%d", path, status);
+        free(envc);
+        errno = status;
+        return -1;
+    }
+    bool needsResume = lease && !(flags & POSIX_SPAWN_START_SUSPENDED);
+    if (lease) {
+        status = posix_spawnattr_setflags(attrp, flags | POSIX_SPAWN_START_SUSPENDED);
+        if (status) {
+            int cleanup = trollstore_lite_txm_end(lease, 0);
+            free(envc);
+            errno = cleanup ?: status;
+            return -1;
+        }
+    }
+    volatile pid_t *blacklistedPID = allocBlacklistProcessId();
+    if (!blacklistedPID) {
+        posix_spawnattr_setflags(attrp, flags);
+        trollstore_lite_txm_end(lease, 0);
+        free(envc);
+        errno = ENOMEM;
+        return -1;
+    }
+    int result = __posix_spawn_orig_wrapper(blacklistedPID, path, desc, argv, envc);
+    // __posix_spawn 失败返回 -1；物理内存访问会清空 errno，必须跨全部清理保存。
+    int spawnError = errno;
+    pid_t pid = *blacklistedPID;
+    if (result == 0 && pid <= 0) { result = -1; spawnError = EIO; }
+    if (result == 0 && pidp) *pidp = pid;
+    commitBlacklistProcessId(blacklistedPID);
+    posix_spawnattr_setflags(attrp, flags);
+    free(envc);
+    int trustStatus = trollstore_lite_txm_end(lease, result == 0 ? pid : 0);
+    if (trustStatus) {
+        JBLogError("blacklisted TXM completion failed path=%s pid=%d status=%d", path, pid, trustStatus);
+        if (result == 0 && pid > 0) kill(pid, SIGKILL);
+    } else if (result == 0) {
+        // 只保留调用方原本请求的挂起兼容逻辑。
+        if (flags & POSIX_SPAWN_START_SUSPENDED) platform_set_process_debugged(pid, false);
+        if (needsResume && kill(pid, SIGCONT) != 0) {
+            JBLogError("blacklisted TXM resume failed path=%s pid=%d errno=%d", path, pid, errno);
+            kill(pid, SIGKILL);
+        }
+    }
+    // 已创建的 PID 仍交给 launchd 接收退出事件；不能伪造 spawn 失败。
+    errno = spawnError;
+    return result;
 }
 
 int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *restrict path, struct _posix_spawn_args_desc *desc, char *const argv[restrict], char *const envp[restrict])
@@ -426,28 +604,67 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
 	}
 #endif
 
-	bool roothideBlacklisted = isBlacklistedPath(path);
+    extern int trust_jailfools_bundle_before_spawn(const char *path);
+    int jailFoolsStatus = trust_jailfools_bundle_before_spawn(path);
+    if (jailFoolsStatus != 0) return jailFoolsStatus;
+
+    struct roothide_app_spawn_policy appPolicy = roothide_get_app_spawn_policy(path);
+	bool roothideBlacklisted = appPolicy.blacklisted;
+    // Automatic: every effectively blacklisted app on a supported device gets the
+    // repair unless the global switch is off or the app is explicitly opted out.
+    // Only probe the helper for an eligible, enabled main application. The
+    // bounded readiness handshake must succeed before a child is spawned.
+    bool requestedIsolation = roothideBlacklisted && iOS15Arm64e && dyld_patch_enabled() &&
+        !launchdhookFirstLoad && spinlock_safe_isolation_enabled() &&
+        appPolicy.verified_main_executable && !appPolicy.isolation_opted_out &&
+        jbdIsolationHelperReady();
+    struct app_isolation_context isolationContext = {
+        .ios15_arm64e = iOS15Arm64e,
+        .global_dyld_fix = dyld_patch_enabled(),
+        .effective_blacklisted = roothideBlacklisted,
+        .choicy_blocked = choicyBlocked,
+        .ordinary_removable_app = appPolicy.verified_main_executable,
+        .not_trollstore = requestedIsolation,
+        .spinlock_safe_opt_in = requestedIsolation,
+        .is_extension = app_isolation_path_is_extension(path),
+        .active_prewarm = envbuf_getenv(envp, "ActivePrewarm") != NULL,
+        .dyld_use_closures = envbuf_getenv(envp, "DYLD_USE_CLOSURES") != NULL,
+        .launchd_first_load = launchdhookFirstLoad,
+    };
+    enum app_isolation_route isolationRoute = app_isolation_policy_decide(&isolationContext);
+    bool strictIsolation = roothideBlacklisted && requestedIsolation &&
+        isolationRoute == APP_ISOLATION_ROUTE_BLACKLIST_SPINLOCK;
 	if (choicyBlocked || roothideBlacklisted)
 	{
+		// 开关仅控制新增 TXM 修复，原有启动前自动信任始终执行。
+		bool trollstoreLiteFixEnabled = trollstore_lite_fix_enabled();
+		int trustStatus = trust_trollstore_lite_bundle_before_spawn(path);
+		if (trustStatus != 0)
+			return trustStatus;
+
 		int ret;
 
 		JBLogDebug("blacklisted app %s", path);
 
-		if(dyld_patch_enabled() && iOS15Arm64e && roothideBlacklisted && (strstr(path, "/PlugIns/") || strstr(path, "/Extensions/") || strstr(path, ".appex/"))) {
-			JBLogDebug("prevent blacklisted app's extension from running: ", path);
-			ret = EPERM;
-		}
-		else if(dyld_patch_enabled() && iOS15Arm64e && roothideBlacklisted && (envbuf_getenv(envp, "ActivePrewarm") || envbuf_getenv(envp, "DYLD_USE_CLOSURES"))) {
-			JBLogDebug("prevent blacklisted app from prewarming: ", path);
-			ret = EPERM;
-		}
+		if (isolationRoute == APP_ISOLATION_ROUTE_REJECT) {
+            JBLogDebug("prevent blacklisted extension/prewarm/closures launch: %s", path);
+            ret = EPERM;
+        }
 		else
 		{
-			char **envc = envbuf_mutcopy((const char **)envp);
+            if (trollstoreLiteFixEnabled && roothideBlacklisted && hasTrollstoreLiteMarker(path) && txm_local_signing_supported()) {
+                return spawn_blacklisted_trollstore_lite(pidp, path, desc, argv, envp);
+            }
 
-			//choicy may set these 
-			envbuf_unsetenv(&envc, "_SafeMode");
-			envbuf_unsetenv(&envc, "_MSSafeMode");
+			char **envc = strictIsolation ? RHIsolationCopyEnvironment((const char *const *)envp,
+                JBROOT_PATH("/"), HOOK_DYLIB_PATH) : envbuf_mutcopy((const char **)envp);
+            if (strictIsolation && !envc) { errno = ENOMEM; return -1; }
+
+            if (!strictIsolation) {
+                // Preserve the legacy path's environment handling exactly.
+                envbuf_unsetenv(&envc, "_SafeMode");
+                envbuf_unsetenv(&envc, "_MSSafeMode");
+            }
 	
 			/* According to xnu, the new thread in new process will not run in userland until after copyout pid
 			https://github.com/apple-oss-distributions/xnu/blob/8d741a5de7ff4191bf97d57b9f54c2f6d4a15585/bsd/kern/kern_exec.c#L4321
@@ -458,28 +675,37 @@ int roothide_launchd___posix_spawn_prehook(pid_t *restrict pidp, const char *res
 			/* and posix_spawn->kernel->amfid->launchd may cause xpc dead loop so we can't use lock-spawn-unlock here */
 	
 			volatile pid_t* blacklistedPidp = allocBlacklistProcessId();
-	
-			if(roothideBlacklisted || !dyld_patch_enabled() || !iOS15Arm64e) {
-				ret = __blacklisted_posix_spawn_orig_wrapper(blacklistedPidp, path, desc, argv, envc);
-			} else {
-				ret = roothide_launchd___posix_spawn__spinlock_fix_only(blacklistedPidp, path, desc, argv, envc);
-			}
-	
+            if (!blacklistedPidp) {
+                if (strictIsolation) RHIsolationFreeEnvironment(envc); else envbuf_free(envc);
+                errno = ENOMEM;
+                return -1;
+            }
+
+            if (strictIsolation) {
+                ret = isolation_spawn_strict((pid_t *)blacklistedPidp, path, desc, argv, envc);
+            } else if (isolationRoute == APP_ISOLATION_ROUTE_BLACKLIST_NATIVE) {
+                ret = __blacklisted_posix_spawn_orig_wrapper(blacklistedPidp, path, desc, argv, envc);
+            } else {
+                ret = roothide_launchd___posix_spawn__spinlock_fix_only(blacklistedPidp, path, desc, argv, envc);
+            }
+            int spawnError = errno;
+
 			pid_t pid = *blacklistedPidp;
 			if(pidp) *pidp = *blacklistedPidp;
 
 			commitBlacklistProcessId(blacklistedPidp); // will release blacklistedPidp
 			blacklistedPidp = NULL;
 
-			envbuf_free(envc);
-				
-			if(ret==0 && pid>0) {
+            if (strictIsolation) RHIsolationFreeEnvironment(envc); else envbuf_free(envc);
+
+			if(!strictIsolation && ret==0 && pid>0) {
 				short flags = 0;
 				posix_spawnattr_getflags(attrp, &flags);
 				if((flags & POSIX_SPAWN_START_SUSPENDED) != 0) {
 					platform_set_process_debugged(pid, false);
 				}
 			}
+            if (strictIsolation) errno = spawnError;
 		}
 	
 		return ret;

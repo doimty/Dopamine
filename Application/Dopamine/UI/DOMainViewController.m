@@ -134,21 +134,15 @@
         jailbreakButtonImage = [UIImage systemImageNamed:@"lock.slash" withConfiguration:[DOGlobalAppearance smallIconImageConfiguration]];
     
     self.jailbreakBtn = [[DOJailbreakButton alloc] initWithAction: [UIAction actionWithTitle:jailbreakButtonTitle image:jailbreakButtonImage identifier:@"jailbreak" handler:^(__kindof UIAction * _Nonnull action) {
-
-
-/********************************** roothide specific ************************************/
-        if(otherJailbreakActived(false)) {
-            UIAlertController *alertController = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Error") message:DOLocalizedString(@"Your device currently has another jailbreak activated, please reboot device.") preferredStyle:UIAlertControllerStyleAlert];
-            UIAlertAction *rebootAction = [UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Close") style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action) {
-                //exit(0);
-            }];
-            [alertController addAction:rebootAction];
-            [self presentViewController:alertController animated:YES completion:nil];
+        // Keep the RootHide activation guard; it is independent of homepage styling.
+        if (otherJailbreakActived(false)) {
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:DOLocalizedString(@"Error")
+                message:DOLocalizedString(@"Other_Jailbreak_Active_Message") preferredStyle:UIAlertControllerStyleAlert];
+            [alert addAction:[UIAlertAction actionWithTitle:DOLocalizedString(@"Button_Close")
+                style:UIAlertActionStyleDefault handler:nil]];
+            [self presentViewController:alert animated:YES completion:nil];
             return;
         }
-/********************************** roothide specific ************************************/
-
-
         [actionView hide];
         [self.jailbreakBtn expandButton: self.jailbreakButtonConstraints];
 
@@ -260,7 +254,7 @@
         [jailbreaker runWithError:&error didRemoveJailbreak:&didRemove showLogs:&showLogs];
         dispatch_async(dispatch_get_main_queue(), ^{
             if (error && showLogs) {
-                [[DOUIManager sharedInstance] sendLog:[NSString stringWithFormat:@"Jailbreak failed with error: %@", error] debug:NO];
+                [[DOUIManager sharedInstance] sendLog:[NSString stringWithFormat:DOLocalizedString(@"Jailbreak_Failed_With_Error"), error] debug:NO];
                 [self.navigationController pushViewController:[[DOLogCrashViewController alloc] initWithTitle:[error localizedDescription]] animated:YES];
             }
             else if (error && !showLogs) {
@@ -304,9 +298,7 @@
 
     if (environmentUpdate)
     {
-/************************************* roothide specfic ***********************************/
         releaseFrom = [[DOEnvironmentManager sharedManager] jailbrokenVersionRootHide];
-/************************************* roothide specfic ***********************************/
         releaseTo = [[DOUIManager sharedInstance] getLaunchedReleaseTag];
     }
 

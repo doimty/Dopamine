@@ -134,14 +134,11 @@ int systemwide_trust_file(audit_token_t *processToken, int rfd, struct siginfo *
 /************************ roothide specfic ************************/
 cdhash_t *cdhashes = NULL;
 uint32_t cdhashCount = 0;
-file_collect_untrusted_cdhashes(fd, &cdhashes, &cdhashCount);
-
-int retval = 0;
-
-if (cdhashes && cdhashCount > 0) {
+int retval = file_collect_untrusted_cdhashes(fd, &cdhashes, &cdhashCount);
+if (retval == 0 && cdhashes && cdhashCount > 0) {
 	retval = jb_trustcache_add_cdhashes(cdhashes, cdhashCount);
-	free(cdhashes);
 }
+free(cdhashes);
 
 close(fd);
 
@@ -255,8 +252,9 @@ int systemwide_process_checkin(audit_token_t *processToken, char **rootPathOut, 
 		}
 	}
 
-	bool fullyDebugged = false;
-	if (isRemovableBundlePath(procPath) || isSubPathOf(procPath, JBROOT_PATH("/Applications"))) {
+	// 越狱目录应用始终完整调试，普通应用仍遵循开关。
+	bool fullyDebugged = isSubPathOf(procPath, JBROOT_PATH("/Applications"));
+	if (isRemovableBundlePath(procPath)) {
 /*************************************** roothide specific *********************************/
 		
 		// This is an app, enable CS_DEBUGGED based on user preference
@@ -359,7 +357,8 @@ int txm_fix_trustlevel(uint64_t);
 			const char *customTrustStr = xpc_string_get_string_ptr(customTrustObj);
 			uint32_t customTrust = pmap_cs_trust_string_to_int(customTrustStr);
 
-			if (host_is_arm64e()) {
+			// SPTM 使用 TXM 签名租约，不能按旧 PPL 链表解释 pmap 中的 ASID。
+			if (host_is_arm64e() && !ksymbol(SPTMArgs)) {
 				if (customTrust >= 2) {
 					uint64_t mainCodeDir = proc_find_main_binary_code_dir(proc);
 					if (mainCodeDir) {
@@ -628,7 +627,7 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_GET_JBROOT
 		{
 			.handler = systemwide_get_jbroot,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "root-path", .type = JBS_TYPE_STRING, .out = true },
 				{ 0 },
 			},
@@ -636,7 +635,7 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_GET_BOOT_UUID
 		{
 			.handler = systemwide_get_boot_uuid,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "boot-uuid", .type = JBS_TYPE_STRING, .out = true },
 				{ 0 },
 			},
@@ -644,7 +643,7 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_TRUST_FILE
 		{
 			.handler = systemwide_trust_file,
-			.args = (jbserver_arg[]){
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "fd", .type = JBS_TYPE_UINT64, .out = false },
 				{ .name = "siginfo", .type = JBS_TYPE_DATA, .out = false },
@@ -655,7 +654,7 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_PROCESS_CHECKIN
 		{
 			.handler = systemwide_process_checkin,
-			.args = (jbserver_arg[]) {
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "root-path", .type = JBS_TYPE_STRING, .out = true },
 				{ .name = "boot-uuid", .type = JBS_TYPE_STRING, .out = true },
@@ -668,7 +667,7 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_FORK_FIX
 		{
 			.handler = systemwide_fork_fix,
-			.args = (jbserver_arg[]) {
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "child-pid", .type = JBS_TYPE_UINT64, .out = false },
 				{ 0 },
@@ -677,7 +676,7 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_CS_REVALIDATE
 		{
 			.handler = systemwide_cs_revalidate,
-			.args = (jbserver_arg[]) {
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ 0 },
 			},
@@ -685,19 +684,21 @@ struct jbserver_domain gSystemwideDomain = {
 		// JBS_SYSTEMWIDE_JBSETTINGS_GET
 		{
 			.handler = jbsettings_get,
-			.args = (jbserver_arg[]) {
+			.args = {
 				{ .name = "key", .type = JBS_TYPE_STRING, .out = false },
 				{ .name = "value", .type = JBS_TYPE_XPC_GENERIC, .out = true },
+				{ 0 },
 			},
 		},
 		// JBS_SYSTEMWIDE_PERSONA_FIX
 		{
 			.handler = systemwide_persona_fix,
-			.args = (jbserver_arg[]) {
+			.args = {
 				{ .name = "caller-token", .type = JBS_TYPE_CALLER_TOKEN, .out = false },
 				{ .name = "child-pid", .type = JBS_TYPE_UINT64, .out = false },
 				{ .name = "overwrite-uid", .type = JBS_TYPE_UINT64, .out = false },
 				{ .name = "overwrite-gid", .type = JBS_TYPE_UINT64, .out = false },
+				{ 0 },
 			},
 		},
 		{ 0 },

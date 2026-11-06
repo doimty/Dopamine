@@ -11,6 +11,42 @@
 #include <libjailbreak/libjailbreak.h>
 #include "common.h"
 #include "log.h"
+#include "app_isolation_ranges.h"
+#include "app_isolation_repair.h"
+#include <bsm/libbsm.h>
+
+extern int audit_token_to_pidversion(audit_token_t token);
+struct isolation_repair_guard {
+    pid_t pid;
+    int pidversion;
+    rh_isolation_cancel_fn cancelled;
+    void *context;
+    mach_port_t task;
+    uint64_t proc;
+    uint64_t kernel_task;
+};
+static __thread struct isolation_repair_guard *isolationGuard;
+
+static bool isolation_guard_cancelled(void)
+{
+    if (!isolationGuard) return false;
+    if (isolationGuard->cancelled(isolationGuard->context) ||
+        proc_get_pidversion(isolationGuard->pid) != isolationGuard->pidversion) return true;
+    if (isolationGuard->proc) {
+        /* proc_find is a lookup, not a reference. Revalidate, never call it a pin.
+         * This is cooperative: a concurrent exit between check and write remains a narrow race. */
+        uint64_t current = proc_find(isolationGuard->pid);
+        if (!current || current != isolationGuard->proc ||
+            proc_task(current) != isolationGuard->kernel_task ||
+            proc_get_pidversion(isolationGuard->pid) != isolationGuard->pidversion) return true;
+    }
+    return isolationGuard->cancelled(isolationGuard->context);
+}
+
+static bool isolation_guard_allows_task(mach_port_t task)
+{
+    return !isolationGuard || (!isolation_guard_cancelled() && task == isolationGuard->task);
+}
 
 uint64_t show_dyld_regions(mach_port_t task, bool more)
 {
@@ -98,6 +134,7 @@ void patchedtest(mach_port_t task, uint64_t remoteLoadAddress)
 #define DYLD_INFO_MAX_SEARCH_INDEX 200
 int task_set_dyld_info(uint64_t task, uint64_t addr, uint64_t size)
 {
+    if (isolationGuard && (isolation_guard_cancelled() || task != isolationGuard->kernel_task)) return -1;
     static uint32_t all_image_info_addr_offset=0, all_image_info_size_offset=0, info_offset=0;
 
     static dispatch_once_t onceToken;
@@ -143,20 +180,26 @@ int task_set_dyld_info(uint64_t task, uint64_t addr, uint64_t size)
 
     if(all_image_info_addr_offset==0 || all_image_info_size_offset==0) {
         JBLogError("invalid all_image_info_addr/size offset");
-        abort();
+        if (!isolationGuard) abort();
         return -1;
     }
 
     if(info_offset) {
         uint64_t info[6] = {0};
+        if (isolation_guard_cancelled()) return -1;
         kwritebuf(task + info_offset, info, sizeof(info));
-    } else if(task != proc_task(proc_find(1))) {
-        JBLogError("invalid info offset");
-        abort();
-        return -1;
+    } else {
+        if (isolationGuard) return -1;
+        if (task != proc_task(proc_find(1))) {
+            JBLogError("invalid info offset");
+            abort();
+            return -1;
+        }
     }
 
+    if (isolation_guard_cancelled()) return -1;
     kwrite64(task + all_image_info_addr_offset, addr);
+    if (isolation_guard_cancelled()) return -1;
     kwrite64(task + all_image_info_size_offset, size);
     return 0;
 }
@@ -515,6 +558,7 @@ br   x0
 
 int hook_dyld_function(mach_port_t task, uint64_t old_func, uint64_t new_func, uint64_t orig_func)
 {
+    if (!isolation_guard_allows_task(task)) return -1;
 /*
 movz x17, 0x0000, lsl 48
 movk x17, 0x0000, lsl 32
@@ -542,18 +586,21 @@ br   x17
         return -1;
     }
 
+    if (!isolation_guard_allows_task(task)) return -1;
     kr = vm_copy(task, (vm_address_t)old_func, sizeof(tramp), (vm_address_t)orig_func);
     if(kr != KERN_SUCCESS) {
         JBLogError("vm_copy failed: %d,%s", kr, mach_error_string(kr));
         return -1;
     }
 
+    if (!isolation_guard_allows_task(task)) return -1;
     kr = vm_write(task, (vm_address_t)(orig_func+sizeof(tramp)), (vm_offset_t)tramp, sizeof(tramp));
     if(kr != KERN_SUCCESS) {
         JBLogError("vm_write failed: %d,%s", kr, mach_error_string(kr));
         return -1;
     }
 
+    if (!isolation_guard_allows_task(task)) return -1;
     kr = vm_protect(task, (vm_address_t)orig_func, sizeof(tramp)*2, false, VM_PROT_READ|VM_PROT_EXECUTE);
     if(kr != KERN_SUCCESS) {
         JBLogError("vm_protect rx failed: %d,%s", kr, mach_error_string(kr));
@@ -569,18 +616,21 @@ br   x17
     codes[2] |= ((new_func >> 16) & 0xffff) << 5;
     codes[3] |= ((new_func >>  0) & 0xffff) << 5;
 
+    if (!isolation_guard_allows_task(task)) return -1;
     kr = vm_protect(task, (vm_address_t)old_func, sizeof(codes), false, VM_PROT_READ|VM_PROT_WRITE|VM_PROT_COPY);
     if(kr != KERN_SUCCESS) {
         JBLogError("vm_protect rw(cpoy) failed: %d,%s", kr, mach_error_string(kr));
         return -1;
     }
 
+    if (!isolation_guard_allows_task(task)) return -1;
     kr = vm_write(task, (vm_address_t)old_func, (vm_offset_t)codes, sizeof(codes));
     if(kr != KERN_SUCCESS) {
         JBLogError("vm_write failed: %d,%s", kr, mach_error_string(kr));
         return -1;
     }
 
+    if (!isolation_guard_allows_task(task)) return -1;
     kr = vm_protect(task, (vm_address_t)old_func, sizeof(void*), false, VM_PROT_READ|VM_PROT_EXECUTE);
     if(kr != KERN_SUCCESS) {
         JBLogError("vm_protect rx failed: %d,%s", kr, mach_error_string(kr));
@@ -590,21 +640,23 @@ br   x17
     return 0;
 }
 
-int proc_patch_dyld_internal(pid_t pid, bool spinlockFixOnly)
+int proc_patch_dyld_internal(pid_t pid, bool spinlockFixOnly, bool strictIsolation)
 {
     int ret = 0;
 
     kern_return_t kr;
     task_port_t task = MACH_PORT_NULL;
     vm_address_t  remoteLoadAddress = 0;
+    uint64_t resolvedProc = 0;
+    if (isolation_guard_cancelled()) return -1;
 
     static struct DYLDINFO* stockDyldInfo = NULL;
     static struct DYLDINFO* patchedDyldInfo = NULL;
 
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        assert((stockDyldInfo=loadDyldInfo("/usr/lib/dyld")) != NULL);
-        assert((patchedDyldInfo=loadDyldInfo(JBROOT_PATH("/basebin/.fakelib/dyld"))) != NULL);
+        stockDyldInfo = loadDyldInfo("/usr/lib/dyld");
+        patchedDyldInfo = loadDyldInfo(JBROOT_PATH("/basebin/.fakelib/dyld"));
     });
 
     if(stockDyldInfo == NULL || patchedDyldInfo == NULL) {
@@ -612,10 +664,47 @@ int proc_patch_dyld_internal(pid_t pid, bool spinlockFixOnly)
         return -1;
     }
 
+    if (strictIsolation) {
+        struct rh_app_isolation_layout layout = {
+            .stock_size = stockDyldInfo->vmSpaceSize,
+            .patched_size = patchedDyldInfo->vmSpaceSize,
+            .stock_cache_function = stockDyldInfo->loadDyldCache_function,
+            .patched_cache_function = patchedDyldInfo->loadDyldCache_function,
+            .patched_trampoline = patchedDyldInfo->loadDyldCache_trampoline,
+        };
+        bool supported = false;
+#ifdef __arm64e__
+        if (!__builtin_available(iOS 16.0, *)) supported = true;
+#endif
+        if (!spinlockFixOnly || !supported || !dyld_patch_enabled() ||
+            !rh_app_isolation_layout_valid(layout, PAGE_SIZE)) {
+            JBLogError("isolation repair rejected: unsupported mode or invalid dyld hook layout");
+            return -1;
+        }
+    }
+
+    if (isolation_guard_cancelled()) goto failed;
     kr = task_for_pid(mach_task_self(), pid, &task);
     if(kr != KERN_SUCCESS || !MACH_PORT_VALID(task)) {
         JBLogError("task_for_pid failed: %x,%s task=%x", kr, mach_error_string(kr), task);
         goto failed;
+    }
+    if (isolationGuard) {
+        audit_token_t token = {0};
+        mach_msg_type_number_t tokenCount = TASK_AUDIT_TOKEN_COUNT;
+        if (isolation_guard_cancelled() ||
+            task_info(task, TASK_AUDIT_TOKEN, (task_info_t)&token, &tokenCount) != KERN_SUCCESS ||
+            tokenCount != TASK_AUDIT_TOKEN_COUNT || audit_token_to_pid(token) != pid ||
+            audit_token_to_pidversion(token) != isolationGuard->pidversion ||
+            isolation_guard_cancelled()) goto failed;
+        isolationGuard->task = task;
+        if (isolation_guard_cancelled()) goto failed;
+        resolvedProc = proc_find(pid);
+        if (!resolvedProc || isolation_guard_cancelled()) goto failed;
+        isolationGuard->kernel_task = proc_task(resolvedProc);
+        if (!isolationGuard->kernel_task) goto failed;
+        isolationGuard->proc = resolvedProc;
+        if (isolation_guard_cancelled()) goto failed;
     }
 
     // show_dyld_regions(task, true);
@@ -628,11 +717,29 @@ int proc_patch_dyld_internal(pid_t pid, bool spinlockFixOnly)
         goto failed;
     }
 
+    if (strictIsolation && (count != TASK_DYLD_INFO_COUNT ||
+        dyldInfo.all_image_info_addr < stockDyldInfo->all_image_info_addr ||
+        dyldInfo.all_image_info_size < sizeof(uint32_t) * 2)) {
+        JBLogError("isolation repair rejected: invalid target dyld info");
+        goto failed;
+    }
     uint64_t dyld_address = dyldInfo.all_image_info_addr - stockDyldInfo->all_image_info_addr;
     uint64_t dyld_entry = dyld_address + stockDyldInfo->entrypoint;
+    if (strictIsolation) {
+        struct mach_header_64 targetHeader = {0};
+        vm_size_t copied = 0;
+        if (!rh_app_isolation_address_span(dyld_address, stockDyldInfo->loadDyldCache_function, 20) ||
+            vm_read_overwrite(task, dyld_address, sizeof(targetHeader), (vm_address_t)&targetHeader, &copied) != KERN_SUCCESS ||
+            copied != sizeof(targetHeader) || targetHeader.magic != MH_MAGIC_64 ||
+            targetHeader.filetype != MH_DYLINKER) {
+            JBLogError("isolation repair rejected: target dyld header mismatch");
+            goto failed;
+        }
+    }
     JBLogDebug("default dyld=%p entry=%p", (void*)dyld_address, (void*)dyld_entry);
 
     vm_prot_t cur_prot=0, max_prot=0;
+    if (!isolation_guard_allows_task(task)) goto failed;
     kr = vm_remap(task, &remoteLoadAddress, patchedDyldInfo->vmSpaceSize, 0, VM_FLAGS_ANYWHERE, mach_task_self(), (mach_vm_address_t)patchedDyldInfo->imageAddress, true, &cur_prot, &max_prot, VM_INHERIT_COPY);
     if(kr != KERN_SUCCESS) {
         JBLogError("vm_remap %d,%s", kr, mach_error_string(kr));
@@ -641,7 +748,15 @@ int proc_patch_dyld_internal(pid_t pid, bool spinlockFixOnly)
 
     JBLogDebug("remap dyld=%p prot=%x/%x", remoteLoadAddress, cur_prot, max_prot);
 
-    uint64_t bsd_proc = proc_find(pid);
+    if (strictIsolation &&
+        (!rh_app_isolation_address_span(remoteLoadAddress, patchedDyldInfo->loadDyldCache_function, 20) ||
+         !rh_app_isolation_address_span(remoteLoadAddress, patchedDyldInfo->loadDyldCache_trampoline, 40))) {
+        JBLogError("isolation repair rejected: mapped patch address overflow");
+        goto failed;
+    }
+
+    if (isolation_guard_cancelled()) goto failed;
+    uint64_t bsd_proc = isolationGuard ? resolvedProc : proc_find(pid);
     if(!bsd_proc) {
         JBLogError("proc_find %d failed", pid);
         goto failed;
@@ -668,6 +783,7 @@ int proc_patch_dyld_internal(pid_t pid, bool spinlockFixOnly)
         uint64_t loadDyldCache_new = remoteLoadAddress + patchedDyldInfo->loadDyldCache_function;
         uint64_t loadDyldCache_orig = remoteLoadAddress + patchedDyldInfo->loadDyldCache_trampoline;
 
+        if (!isolation_guard_allows_task(task)) goto failed;
         cs_allow_invalid(bsd_proc, false);
 
         if(hook_dyld_function(task, loadDyldCache_old, loadDyldCache_new, loadDyldCache_orig) != 0) {
@@ -681,6 +797,7 @@ int proc_patch_dyld_internal(pid_t pid, bool spinlockFixOnly)
         }
 
         //destroy macho header
+        if (!isolation_guard_allows_task(task)) goto failed;
         kr = vm_deallocate(task, remoteLoadAddress, PAGE_SIZE);
         if(kr != KERN_SUCCESS) {
             JBLogError("vm_deallocate failed: %d,%s", kr, mach_error_string(kr));
@@ -798,21 +915,42 @@ reentry_end:
 
 failed:
     ret = -1;
-    if(remoteLoadAddress) {
+    /* After cancellation the stopped target belongs to the caller's kill path.
+     * Do not issue additional remote cleanup writes against it. */
+    if(remoteLoadAddress && isolation_guard_allows_task(task)) {
         vm_deallocate(task, remoteLoadAddress, patchedDyldInfo->vmSpaceSize);
     }
 
 final:
+    if (isolation_guard_cancelled()) ret = -1;
     if(MACH_PORT_VALID(task)) mach_port_deallocate(mach_task_self(), task);
     return ret;
 }
 
 int proc_patch_dyld(pid_t pid)
 {
-    return proc_patch_dyld_internal(pid, false);
+    return proc_patch_dyld_internal(pid, false, false);
 }
 
 int proc_fix_spinlock(pid_t pid)
 {
-    return proc_patch_dyld_internal(pid, true);
+    return proc_patch_dyld_internal(pid, true, false);
+}
+
+int proc_fix_spinlock_strict(pid_t pid)
+{
+    return proc_patch_dyld_internal(pid, true, true);
+}
+
+int proc_fix_spinlock_strict_checked(pid_t pid, int expected_pidversion,
+                                    rh_isolation_cancel_fn cancelled, void *context)
+{
+    if (pid <= 1 || expected_pidversion <= 0 || !cancelled) return -1;
+    struct isolation_repair_guard guard = {pid, expected_pidversion, cancelled, context,
+                                           MACH_PORT_NULL, 0, 0};
+    struct isolation_repair_guard *previous = isolationGuard;
+    isolationGuard = &guard;
+    int result = proc_patch_dyld_internal(pid, true, true);
+    isolationGuard = previous;
+    return result;
 }

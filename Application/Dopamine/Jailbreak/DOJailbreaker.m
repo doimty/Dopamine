@@ -6,6 +6,7 @@
 //
 
 #import "DOJailbreaker.h"
+#import "DORuntimeConfiguration.h"
 #import "DOEnvironmentManager.h"
 #import "DOExploitManager.h"
 #import "DOUIManager.h"
@@ -627,6 +628,8 @@ void *boomerang_server(struct boomerang_info *info)
     }
     
     gSystemInfo.jailbreakSettings.markAppsAsDebugged = appJITEnabled;
+    gSystemInfo.jailbreakSettings.trollStoreLiteFixDisabled = ![[DOPreferenceManager sharedManager] boolPreferenceValueForKey:@"trollStoreLiteFixEnabled" fallback:YES];
+    gSystemInfo.jailbreakSettings.spinlockSafeIsolationDisabled = ![[DOPreferenceManager sharedManager] boolPreferenceValueForKey:@"spinlockSafeIsolationEnabled" fallback:YES];
     gSystemInfo.jailbreakSettings.jetsamMultiplier = jetsamMultiplierOption ? (jetsamMultiplierOption.doubleValue / 2) : 0;
     
     
@@ -704,6 +707,12 @@ void *boomerang_server(struct boomerang_info *info)
         return;
     }
 
+    *errOut = [DORuntimeConfiguration prepare];
+    if (*errOut) {
+        [self cleanUpPostExploitation];
+        return;
+    }
+
     [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Initializing Environment") debug:NO];
     *errOut = [self injectLaunchdHook];
     if (*errOut) {
@@ -734,7 +743,7 @@ void *boomerang_server(struct boomerang_info *info)
 */
 
 /*************************** roothide specific *******************/
-[[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Hiding Jailbreak") debug:NO];
+[[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Hiding_Jailbreak") debug:NO];
 
 int ret = basebin_generate(false);
 if (ret != 0) {
@@ -771,10 +780,16 @@ setenv("DYLD_INSERT_LIBRARIES", JBROOT_PATH("/basebin/systemhook.dylib"), 1);
         return;
     }
     
+    *errOut = [DORuntimeConfiguration restoreCustomMounts];
+    if (*errOut) {
+        [self cleanUpPostExploitation];
+        return;
+    }
+
     [[DOEnvironmentManager sharedManager] setIDownloadEnabled:idownloadEnabled needsUnsandbox:NO];
     
 /*
-    [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Checking For Duplicate Apps") debug:NO];
+    [[DOUIManager sharedInstance] sendLog:DOLocalizedString(@"Checking_For_Duplicate_Apps") debug:NO];
     *errOut = [self ensureNoDuplicateApps];
     if (*errOut) {
         [self cleanUpPostExploitation];

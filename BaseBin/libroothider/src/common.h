@@ -28,6 +28,7 @@ int wait_for_exit(pid_t pid);
 bool proc_cantrace(pid_t pid);
 int proc_patch_dyld(pid_t pid);
 int proc_fix_spinlock(pid_t pid);
+int proc_fix_spinlock_strict(pid_t pid);
 int proc_patch_csflags(pid_t pid);
 pid_t proc_get_ppid(pid_t pid);
 int proc_get_pidversion(pid_t pid);
@@ -38,6 +39,17 @@ char* proc_get_identifier(pid_t pid, char buffer[255]);
 
 bool isBlacklistedApp(const char* identifier);
 bool isBlacklistedPath(const char* path);
+bool appSpinlockIsolationRequested(const char *path);
+bool appSpinlockIsolationOptedOut(const char *path);
+
+// Effective blacklist and opt-out share one retained RootHideConfig snapshot.
+// Main-executable eligibility is independent: helpers keep their old blacklist.
+struct roothide_app_spawn_policy {
+    bool blacklisted;
+    bool verified_main_executable;
+    bool isolation_opted_out;
+};
+struct roothide_app_spawn_policy roothide_get_app_spawn_policy(const char *path);
 
 bool isBlacklistedToken(audit_token_t* token);
 bool isBlacklistedPid(pid_t pid);
@@ -55,6 +67,8 @@ bool string_has_prefix(const char *str, const char* prefix);
 bool string_has_suffix(const char* str, const char* suffix);
 
 bool hasTrollstoreMarker(const char* path);
+bool hasJailFoolsMarker(const char *path);
+
 bool hasTrollstoreLiteMarker(const char* path);
 
 void ensure_jbroot_symlink(const char* filepath);
@@ -89,6 +103,9 @@ bool is_apple_internal_identifier(const char* identifier);
 
 #ifdef __OBJC__
 
+@class NSString;
+NSString *getAppBundlePathFromSpawnPath(const char *path);
+
 #define APPLE_INTERNAL_IDENTIFIERS @[\
     @"com.apple.atrun",\
     @"com.apple.kdumpd",\
@@ -102,6 +119,8 @@ bool is_apple_internal_identifier(const char* identifier);
     @"com.opa334.Dopamine",\
     @"com.opa334.Dopamine.roothide",\
     @"com.opa334.Dopamine-roothide",\
+    @"cn.zqbb.dopaRH",\
+    @"com.doimty.dopamine",\
 ]
 
 @class NSSet;

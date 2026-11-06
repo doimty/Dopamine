@@ -15,4 +15,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
+// Compare the bundled base version first, then its RootHide revision. The
+// release-tag helpers above intentionally keep their existing semantics.
+FOUNDATION_EXPORT BOOL DOEnvironmentVersionNeedsUpdate(
+    NSString * _Nullable bundledVersion,
+    NSString * _Nullable installedBaseVersion,
+    NSString * _Nullable installedRootHideRevision);
+
 NS_ASSUME_NONNULL_END
